@@ -1,0 +1,13 @@
+# This file is managed by Copier; DO NOT EDIT OR REMOVE.
+_commit: v0.4.1
+_src_path: https://github.com/quantco/copier-template-python-open-source
+add_autobump_workflow: true
+author_email: melund@gmail.com
+author_name: Morten Enemark Lund
+github_url: https://github.com/AnyBody-Research-Group/sillywalk
+github_user: melund
+minimal_python_version: py311
+project_short_description: Library for maximum likelihood principal component analysis
+    for AnyBody models
+project_slug: sillywalk
+use_devcontainer: false
