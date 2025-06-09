@@ -1,1 +1,6 @@
+# Disable git eol automatic conversion 
+# We rely on .editorconfig to handle line endings correctly
+# and commit files with the actual line endings
+* -text
+
 pixi.lock merge=binary linguist-language=YAML linguist-generated=true

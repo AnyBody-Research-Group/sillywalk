@@ -1,0 +1,14 @@
+# To learn more about .editorconfig see https://aka.ms/editorconfigdocs
+# AnyBody Technology VS2022 C++ style
+
+root = true
+
+# All files
+[*]
+indent_style = space
+end_of_line = lf
+charset = utf-8
+
+[*.any]
+end_of_line = crlf
+charset = utf-8
