@@ -1,8 +1,6 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm", "wheel"]
-
-[tool.setuptools_scm]
-version_scheme = "post-release"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "sillywalk"
@@ -25,10 +23,9 @@ dependencies = [
 [project.urls]
 repository = "https://github.com/AnyBody-Research-Group/sillywalk"
 
-[tool.setuptools.packages.find]
-include = ["sillywalk"]
-
-[project.scripts]
+[tool.hatch.version]
+path = "pixi.toml"
+pattern = "version = \"(?P<version>[^\"]+)\""
 
 [tool.ruff]
 line-length = 88

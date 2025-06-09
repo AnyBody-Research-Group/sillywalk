@@ -8,20 +8,18 @@ preview = ["pixi-build"]
 
 
 [tasks]
-postinstall = "pip install --no-build-isolation --no-deps --disable-pip-version-check -e ."
 
 [dependencies]
 sillywalk = { path = "."}
 
 [package]
 name = "sillywalk"
-version= "0.1.0"
+version = "0.1.0"
 build.backend = {name = "pixi-build-python", version = "*"}
 
 [package.host-dependencies]
+hatchling = "*"
 pip = "*"
-setuptools = ">=61"
-setuptools-scm = "*"
 
 [package.run-dependencies]
 numpy = "*"
@@ -32,9 +30,9 @@ narwhals = "*"
 pytest = ">=6"
 pytest-cov = "*"
 mypy = "*"
-marimo = "*"
+marimo = "*"  
 nodejs = "*"
-
+polars = "*"
 
 [feature.test.tasks]
 test = "pytest"
@@ -44,8 +42,7 @@ test-coverage = "pytest --cov=sillywalk --cov-report=xml --cov-report=term-missi
 python-build = "*"
 twine = "*"
 wheel = "*"
-setuptools = ">=61"
-setuptools-scm = "*"
+hatchling = "*"
 
 [feature.build.tasks]
 build-wheel = "python -m build --no-isolation ."
