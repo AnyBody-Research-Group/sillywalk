@@ -1,6 +1,20 @@
+import polars as pl
+
 def test_hard():
     import sillywalk  # noqa
 
-    # this is just a demo that pytest can produce good error messages just by
-    # parsing assert statements
-    assert {"a": 1, "b": 2} == {"a": 1, "b": 2}
+    version = sillywalk.__version__
+    assert version == "unknown" or isinstance(version, str), f"Expected version to be 'unknown' or a string, got {version!r}"
+
+    df = pl.read_csv("tests/students.csv")
+
+    model = sillywalk.PCAPredictor(df)
+
+    f = {
+        'Sex': 2,
+        'Stature': 180,
+        'Bodyweight': 65,
+    }
+    row = model.predict(f)
+    print(row)
+
