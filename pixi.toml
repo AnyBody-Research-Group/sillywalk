@@ -1,4 +1,4 @@
-[workspace] 
+[workspace]
 channels = [
   "https://prefix.dev/pixi-build-backends",
   "https://prefix.dev/conda-forge",
@@ -10,12 +10,12 @@ preview = ["pixi-build"]
 [tasks]
 
 [dependencies]
-sillywalk = { path = "."}
+sillywalk = { path = "." }
 
 [package]
 name = "sillywalk"
-version = "0.1.0"
-build.backend = {name = "pixi-build-python", version = "*"}
+version = "1.0.0a0"
+build.backend = { name = "pixi-build-python", version = "*" }
 
 [package.host-dependencies]
 hatchling = "*"
@@ -30,7 +30,7 @@ narwhals = "*"
 pytest = ">=6"
 pytest-cov = "*"
 mypy = "*"
-marimo = "*"  
+marimo = "*"
 nodejs = "*"
 polars = "*"
 
@@ -43,6 +43,7 @@ python-build = "*"
 twine = "*"
 wheel = "*"
 hatchling = "*"
+hatch = "*"
 
 [feature.build.tasks]
 build-wheel = "python -m build --no-isolation ."
@@ -57,6 +58,7 @@ prettier = "*"
 taplo = "*"
 pre-commit-hooks = "*"
 typos = "*"
+
 [feature.lint.tasks]
 pre-commit-install = "pre-commit install"
 pre-commit-run = "pre-commit run -a"

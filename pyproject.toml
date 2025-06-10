@@ -15,10 +15,7 @@ classifiers = [
 ]
 requires-python = ">=3.11"
 readme = "README.md"
-dependencies = [
-  "scikit-learn",
-  "narwhals",
-]
+dependencies = ["scikit-learn", "narwhals"]
 
 [project.urls]
 repository = "https://github.com/AnyBody-Research-Group/sillywalk"

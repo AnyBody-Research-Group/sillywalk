@@ -1,4 +1,4 @@
-# Disable git eol automatic conversion 
+# Disable git eol automatic conversion
 # We rely on .editorconfig to handle line endings correctly
 # and commit files with the actual line endings
 * -text
