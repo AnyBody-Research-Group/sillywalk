@@ -132,7 +132,7 @@ class PCAPredictor:
     def predict(
         self,
         constraints: Mapping[str, float | int],
-        target_pcs: np.ndarray | None = None,
+        target_pcs: NDArray | None = None,
     ) -> dict[str, float | int]:
         low_variance_constraints = [
             col for col in constraints if col in self._low_variance_columns
