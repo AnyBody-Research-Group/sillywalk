@@ -41,8 +41,11 @@ class PCAPredictor:
 
         self.pca_columns = dict(zip(pca_columns, range(len(pca_columns))))
         self.pca_components = np.array(pca_components)
+        self.pca_explained_variance_ratio = np.array(pca_eigenvalues) / np.sum(
+            pca_eigenvalues
+        )
+        self.pca_low_variance_columns = set(all_columns).difference(pca_columns)
 
-        self._low_variance_columns = set(all_columns).difference(pca_columns)
         self._mean_vec = np.array([self.all_means[col] for col in self.pca_columns])
         self._std_vec = np.array([self.all_stds[col] for col in self.pca_columns])
         self._eigenvalues = np.array(pca_eigenvalues)
@@ -72,12 +75,12 @@ class PCAPredictor:
 
     def __init__(
         self,
-        df_native: IntoFrame,
+        data: IntoFrame,
         n_components: int | None = None,
         variance_threshold: float = 1e-8,
         relative_variance_ratio: float = 1e-3,
     ):
-        df = nw.from_native(df_native)
+        df = nw.from_native(data, eager_only=True)
 
         # original_columns = df.columns
         # low_variance_cols = []
@@ -135,7 +138,7 @@ class PCAPredictor:
         target_pcs: NDArray | None = None,
     ) -> dict[str, float | int]:
         low_variance_constraints = [
-            col for col in constraints if col in self._low_variance_columns
+            col for col in constraints if col in self.pca_low_variance_columns
         ]
         if low_variance_constraints:
             raise ValueError(
@@ -187,12 +190,9 @@ class PCAPredictor:
         x_hat_original = x_hat_standardized * self._std_vec + self._mean_vec
         predicted_reduced = dict(zip(self.pca_columns, x_hat_original))
 
-        full_prediction = dict()
-        for col in self.all_columns:
-            if col in self.pca_columns:
-                full_prediction[col] = predicted_reduced[col]
-            else:
-                full_prediction[col] = self.all_means[col]
+        full_prediction = self.all_means.copy()
+        for col in self.pca_columns:
+            full_prediction[col] = predicted_reduced[col]
 
         self.y_opt = y_opt
 

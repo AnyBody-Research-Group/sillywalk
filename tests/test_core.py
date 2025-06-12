@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 import polars as pl
 
@@ -12,12 +14,16 @@ def test_hard():
 
     model = sillywalk.PCAPredictor(df)
 
-    f = {
+    constraints = {
         "Sex": 2,
         "Stature": 180,
         "Bodyweight": 65,
     }
-    row = model.predict(f)
-    values = np.array(list(row.values()))
-    expected = np.array([2.0, 25.39551207, 180.0, 65.0, 39.53788392])
-    np.testing.assert_array_almost_equal(values, expected, decimal=5)
+    result = model.predict(constraints)
+    for key, value in constraints.items():
+        assert math.isclose(result[key], value), (
+            f"Expected {key} to be {value}, got {result[key]}"
+        )
+
+    np.testing.assert_array_almost_equal(result["Age"], 25.39551, decimal=5)
+    np.testing.assert_array_almost_equal(result["Shoesize"], 39.53788392, decimal=5)
