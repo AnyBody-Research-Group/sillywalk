@@ -25,6 +25,7 @@ pip = "*"
 numpy = "*"
 scikit-learn = "*"
 narwhals = "*"
+jinja2 = "*"
 
 [feature.test.dependencies]
 pytest = ">=6"
