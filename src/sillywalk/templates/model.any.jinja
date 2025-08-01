@@ -1,0 +1,81 @@
+
+
+{% if scalar_data.get("Weight") or scalar_data.get("Height") %}
+Main.HumanModel.Anthropometrics =
+{
+  {{"//" if not scalar_data.get("Weight") }}BodyMass = {{ scalar_data.get("Weight", "70; // not defined in dataset") }};
+  {{"//" if not scalar_data.get("Height") }}BodyHeight = {{ scalar_data.get("Height", "1.7; // not defined in dataset") }};
+};
+{% endif %}
+
+
+
+{%- for key, val in scalar_data.items() if key.startswith("Main.HumanModel.Anthropometrics.SegmentDimensions.") %}
+{%- if loop.first %}
+Main.HumanModel.Anthropometrics.SegmentDimensions =
+{
+{%- endif %}
+  {{key.removeprefix("Main.HumanModel.Anthropometrics.SegmentDimensions.")}} = DesignVar({{val}});
+{%- if loop.last %}
+};
+{% endif %}
+{%- endfor %}
+
+
+
+{%- for key, val in scalar_data.items() if key.startswith("Main.ModelSetup.TrialSpecificData.") %}
+{%- if loop.first %}
+Main.ModelSetup.TrialSpecificData =
+{
+{%- endif %}
+  {{key.removeprefix("Main.ModelSetup.TrialSpecificData.")}} = DesignVar({{val}});
+{%- if loop.last %}
+};
+{% endif %}
+{%- endfor %}
+
+
+
+
+{%- for key, val in scalar_data.items() if key.startswith("Main.ModelSetup.SubjectSpecificData.") %}
+{%- if loop.first %}
+Main.ModelSetup.SubjectSpecificData =
+{
+{%- endif %}
+  {{key.removeprefix("Main.ModelSetup.SubjectSpecificData.")}} = DesignVar({{val}});
+{%- if loop.last %}
+};
+{% endif %}
+{%- endfor %}
+
+
+
+
+{% for name, obj in fourier_data.items() if obj.prefix == "DOF:" %}
+{%- if loop.first %}
+AnyFolder PCA_drivers = {
+  AnyVar Freq =  DesignVar({{scalar_data["omega"]}}/(2*pi));
+  AnyFolder JointsAndDrivers = {
+{%- endif %}
+    AnyKinEqFourierDriver {{name}} = {
+      Type = CosSin;
+      Freq = ..Freq;
+      CType = {Hard};
+      Reaction.Type = {Off};
+      MeasureOrganizer = { {{- obj.index -}} };
+      AnyKinMeasure &m = Main.HumanModel.BodyModel.{{obj.measure}};
+      AnyVar a0_offset ??= DesignVar(0.0);
+      A = {{ '{{ '}} {{ obj.a[0] }} + a0_offset, {% for i in range(1, obj.a | length) %}{{obj.a[i]}}, {% endfor %} {{ '}}' }}
+      B = {{ '{{' }} {% for i in range(0, obj.b | length) %}{{obj.b[i]}}, {% endfor %} {{ '}}' }}
+    };
+
+{%- if loop.last %}
+  };// JointsAndDrivers
+};//ModelEnvironmentConnection
+{% endif %}
+{%- endfor %}
+
+{#
+
+
+#}

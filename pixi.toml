@@ -31,12 +31,13 @@ jinja2 = "*"
 pytest = ">=6"
 pytest-cov = "*"
 mypy = "*"
-marimo = "*"
+marimo = ">=0.13.6,<0.15"
 nodejs = "*"
 polars = "*"
 pandas = "*"
 pyarrow = "*"
 pandas-stubs = "*"
+debugpy = "*"
 
 [feature.test.tasks]
 test = "pytest"
@@ -76,7 +77,7 @@ python = "3.12.*"
 python = "3.13.*"
 
 [environments]
-default = ["py312", "test"]
+default = ["py313", "test"]
 py311 = ["py311", "test"]
 py312 = ["py312", "test"]
 py313 = ["py313", "test"]

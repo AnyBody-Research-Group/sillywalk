@@ -1,82 +1,85 @@
 import re
 from collections import defaultdict
+from pathlib import Path
+from typing import Any
 
-from jinja2 import Environment, PackageLoader
+import numpy as np
+from jinja2 import Environment, PackageLoader, Template
 
-FOURIER_DRIVER_RE = re.compile(
-    r"(?P<group>(?P<measure>.+?)(_(?P<index>\d))?)_(?P<coef>[ab]\d+)"
+FOURIER_DATA_RE = re.compile(
+    r"(?P<prefix>.+:)?(?P<group>(?P<measure>.+?)(.Pos\[(?P<index>\d)\])?)_(?P<coef>[ab]\d+)"
 )
 
-jinja_env = Environment(loader=PackageLoader("sillywalk", "templates"))
-
-preprocess_templ_data = {}
+jinja_env = Environment(loader=PackageLoader("sillywalk"))
 
 
-def register_template(key):
-    def decorator(function):
-        preprocess_templ_data[key] = function
-        return function
+def calc_anybody_fourier_coefficients(signal, n_modes=6):
+    """Calculate the fourier coefficients for a given signal.
+    Returns values which can be used with AnyBody "AnyKinEqFourierDriver" class and the Type=CosSin setting.
+    """
+    y = 2 * np.fft.rfft(signal) / signal.size
+    # AnyBody's fourier implementation expect a0 to be divided by 2.
+    a = y[0:n_modes].real
+    b = -y[0:n_modes].imag
+    a[0] /= 2  # Adjust a0 to match AnyBody's definition
+    return a, b
 
-    return decorator
+
+def _add_new_coefficient(groupdata: dict, coef: str, val: float):
+    coeftype = coef[0]
+    coefficient_index = int(coef[1:])
+
+    if len(groupdata[coeftype]) < coefficient_index + 1:
+        # Extend the list to accommodate the new coefficient
+        groupdata[coeftype].extend(
+            [-1] * (coefficient_index + 1 - len(groupdata[coeftype]))
+        )
+    groupdata[coeftype][coefficient_index] = val
 
 
-@register_template("fourier-model")
-def _prepare_data_fourier_model(data):
-    """Prepare template data for the fourier model template"""
-
-    templatedata: dict[str, dict] = {
-        "Drivers": defaultdict(lambda: {}),
-        "TimeSeries": defaultdict(lambda: {}),
-        "SegmentDimensions": {},
-        "Other": {},
+def _prepare_template_data(data: dict[str, float]) -> dict[str, Any]:
+    templatedata: dict[str, dict[Any, Any]] = {
+        "fourier_data": defaultdict(lambda: {}),
+        "scalar_data": defaultdict(lambda: {}),
     }
 
     for key, val in data.items():
-        match = FOURIER_DRIVER_RE.match(key)
+        match = FOURIER_DATA_RE.match(key)
         if match:
-            elem = {}
             mdict = match.groupdict()
-            groupname = mdict["group"].replace(".", "_")
-            elem["measure"] = mdict["measure"]
-            elem["index"] = int(mdict["index"] or 0)
-            elem[mdict["coef"]] = val
-            if groupname.startswith(("Trunk", "Interface")):
-                templatedata["Drivers"][groupname].update(elem)
-            else:
-                templatedata["TimeSeries"][groupname].update(elem)
-        elif ".SegmentDimensions." in key:
-            _, _, key = key.partition(".SegmentDimensions.")
-            templatedata["SegmentDimensions"][key] = val
+            groupname = mdict["group"].removeprefix(
+                "Main.HumanModel.BodyModel.Interface."
+            )
+            groupname = groupname.replace(".", "_").replace("[", "_").replace("]", "")
+            coef = mdict["coef"]
+
+            if groupname not in templatedata["fourier_data"]:
+                templatedata["fourier_data"][groupname] = {
+                    "prefix": mdict["prefix"] or "",
+                    "measure": mdict["measure"],
+                    "index": int(mdict["index"]) if mdict["index"] else None,
+                    "a": [0],
+                    "b": [0],
+                }
+            _add_new_coefficient(templatedata["fourier_data"][groupname], coef, val)
+
         else:
-            templatedata["Other"][key] = val
+            templatedata["scalar_data"][key] = val
 
     return templatedata
 
 
-@register_template("anyman")
-def _prepare_data_anyman_file(data):
-    """prepare template data to create a AMS anyman file to use with ScalingXYZ"""
+def create_model_file(
+    data: dict[str, float],
+    targetfile="trialdata.any",
+    template_file: str | None = None,
+    prepfunc=_prepare_template_data,
+):
+    if template_file is not None:
+        template = Template(Path(template_file).read_text())
+    else:
+        template = jinja_env.get_template("model.any.jinja")
 
-    templatedata: dict[str, dict] = {
-        "SegmentDimensions": {},
-        "Anthropometrics": {},
-    }
-
-    for key, val in data.items():
-        if ".Anthropometrics." in key:
-            _, _, key = key.partition(".Anthropometrics.")
-            if "SegmentDimensions." in key:
-                _, _, key = key.partition("SegmentDimensions.")
-                templatedata["SegmentDimensions"][key] = val
-            else:
-                templatedata["Anthropometrics"][key] = val
-
-    return templatedata
-
-
-def write_template(data, targetfile="trialdata.any", model="fourier-model"):
-    template = jinja_env.get_template(f"{model}.any")
-    template_data = preprocess_templ_data[model](data)
-
+    template_data = prepfunc(data)
     with open(targetfile, "w+") as fh:
         fh.write(template.render(**template_data))
