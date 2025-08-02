@@ -74,6 +74,7 @@ def create_model_file(
     targetfile="trialdata.any",
     template_file: str | None = None,
     prepfunc=_prepare_template_data,
+    create_human_model: bool = False,
 ):
     if template_file is not None:
         template = Template(Path(template_file).read_text())
@@ -81,5 +82,6 @@ def create_model_file(
         template = jinja_env.get_template("model.any.jinja")
 
     template_data = prepfunc(data)
+    template_data["create_human_model"] = create_human_model
     with open(targetfile, "w+") as fh:
         fh.write(template.render(**template_data))

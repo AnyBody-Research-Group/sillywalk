@@ -8,6 +8,7 @@ This is John Rasmussen and Morten Enemark Lund's implementation of the sillywalk
 
 from collections.abc import Mapping, Sequence
 from os import PathLike
+from warnings import warn
 
 import narwhals as nw
 import numpy as np
@@ -185,11 +186,17 @@ class PCAPredictor:
 
     def predict(
         self,
-        constraints: Mapping[str, float | int] | IntoDataFrame,
+        constraints: Mapping[str, float | int] | IntoDataFrame | None = None,
         target_pcs: NDArray | None = None,
     ) -> dict[str, float | int]:
         if not isinstance(constraints, Mapping):
             constraints = _dataframe_to_dict(constraints)
+
+        if not constraints:
+            warn(
+                "No constraints provided. Result is the mean value of the PCA columns."
+            )
+            constraints = {self.pca_columns[0]: self._pca_means[0]}
 
         low_variance_constraints = [
             col for col in constraints if col in self.pca_low_variance_columns

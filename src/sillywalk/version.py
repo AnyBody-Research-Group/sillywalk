@@ -1,6 +1,6 @@
 from importlib.metadata import version
 
-__version__ = version(__package__)
+__version__ = version(__package__ or "")
 
 if __version__.startswith("0.0.1"):
     # Probably started in development mode,

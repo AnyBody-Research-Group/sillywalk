@@ -2,8 +2,9 @@
 channels = [
   "https://prefix.dev/pixi-build-backends",
   "https://prefix.dev/conda-forge",
+  "conda-forge/label/ty_alpha",
 ]
-platforms = ["win-64", "linux-64", "osx-arm64", "osx-64"]
+platforms = ["win-64", "linux-64"]
 preview = ["pixi-build"]
 
 
@@ -30,7 +31,7 @@ jinja2 = "*"
 [feature.test.dependencies]
 pytest = ">=6"
 pytest-cov = "*"
-mypy = "*"
+ty = "*"
 marimo = ">=0.13.6,<0.15"
 nodejs = "*"
 polars = "*"

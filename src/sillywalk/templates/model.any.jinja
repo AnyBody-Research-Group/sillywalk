@@ -1,3 +1,27 @@
+{% if create_human_model %}
+#include "<ANYBODY_PATH_INSTALLDIR>/AMMR/libdef.any"
+
+Main =
+{
+  #define BM_SCALING _SCALING_XYZ_
+  #define BM_TRUNK_MUSCLES OFF
+  #define BM_ARM_MUSCLES_RIGHT OFF
+  #define BM_ARM_MUSCLES_LEFT OFF
+  #define BM_LEG_MUSCLES_RIGHT OFF
+  #define BM_LEG_MUSCLES_LEFT OFF
+
+  #include "<ANYBODY_PATH_BODY>/HumanModel.any"
+
+  AnyBodyStudy Study =
+  {
+     AnyFolder& BodyModel = Main.HumanModel.BodyModel;
+     AnyFolder& Drivers = Main.PCA_drivers;
+     Gravity = {0, 0, -9.81};
+     tStart = 0;
+     tEnd = 1/Main.PCA_drivers.Freq + 1/(Main.PCA_drivers.Freq*Main.PCA_drivers.nStep);
+  };
+
+{% endif%}
 
 
 {% if scalar_data.get("Weight") or scalar_data.get("Height") %}
@@ -7,8 +31,6 @@ Main.HumanModel.Anthropometrics =
   {{"//" if not scalar_data.get("Height") }}BodyHeight = {{ scalar_data.get("Height", "1.7; // not defined in dataset") }};
 };
 {% endif %}
-
-
 
 {%- for key, val in scalar_data.items() if key.startswith("Main.HumanModel.Anthropometrics.SegmentDimensions.") %}
 {%- if loop.first %}
@@ -20,7 +42,6 @@ Main.HumanModel.Anthropometrics.SegmentDimensions =
 };
 {% endif %}
 {%- endfor %}
-
 
 
 {%- for key, val in scalar_data.items() if key.startswith("Main.ModelSetup.TrialSpecificData.") %}
@@ -51,10 +72,25 @@ Main.ModelSetup.SubjectSpecificData =
 
 
 
+
 {% for name, obj in fourier_data.items() if obj.prefix == "DOF:" %}
 {%- if loop.first %}
 AnyFolder PCA_drivers = {
   AnyVar Freq =  DesignVar({{scalar_data["omega"]}}/(2*pi));
+
+  AnyMechObjectExcluder ExlucdeRhythms =
+  {
+    Objects = arrcat(
+      ObjSearch("Main.HumanModel.BodyModel.Trunk.JointsLumbar.SpineRhythmDrv*","AnyKinEq"),
+      ObjSearch("Main.HumanModel.BodyModel.Trunk.JointsCervicalSpine.*.rhythm*","AnyKinEq"),
+      ObjSearch("Main.HumanModel.BodyModel.*.ShoulderArm.Jnt.Clavicula*Driver","AnyKinEq"),
+      ObjSearch("Main.HumanModel.BodyModel.*.ShoulderArm.Jnt.Scapula*Driver","AnyKinEq"),
+      ObjSearch("Main.HumanModel.BodyModel.*.ShoulderArm.Jnt.ScapulaTSThoraxNodeDriver","AnyKinEq"),
+      ObjSearch("Main.HumanModel.BodyModel.*.ShoulderArm.Jnt.ConoideumLigamentDrv","AnyKinEq"),
+      ObjSearch("Main.HumanModel.BodyModel.*.ShoulderArm.Jnt.SternoClavicularRotationRhythm","AnyKinEq")
+    );
+  };
+
   AnyFolder JointsAndDrivers = {
 {%- endif %}
     AnyKinEqFourierDriver {{name}} = {
@@ -65,8 +101,8 @@ AnyFolder PCA_drivers = {
       MeasureOrganizer = { {{- obj.index -}} };
       AnyKinMeasure &m = Main.HumanModel.BodyModel.{{obj.measure}};
       AnyVar a0_offset ??= DesignVar(0.0);
-      A = {{ '{{ '}} {{ obj.a[0] }} + a0_offset, {% for i in range(1, obj.a | length) %}{{obj.a[i]}}, {% endfor %} {{ '}}' }}
-      B = {{ '{{' }} {% for i in range(0, obj.b | length) %}{{obj.b[i]}}, {% endfor %} {{ '}}' }}
+      A = {{ '{{ '}} {{ obj.a[0] }} + a0_offset, {% for i in range(1, obj.a | length) %}{{obj.a[i]}}, {% endfor %} {{ '}}' }};
+      B = {{ '{{' }} {% for i in range(0, obj.b | length) %}{{obj.b[i]}}, {% endfor %} {{ '}}' }};
     };
 
 {%- if loop.last %}
@@ -75,7 +111,7 @@ AnyFolder PCA_drivers = {
 {% endif %}
 {%- endfor %}
 
-{#
 
-
-#}
+{% if create_human_model %}
+}; // Main
+{% endif %}

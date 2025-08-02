@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.14.0"
+__generated_with = "0.14.16"
 app = marimo.App(width="medium")
 
 
@@ -44,6 +44,14 @@ def collection_of_tests(df_students, math, pd, pl, pytest, sillywalk):
 
     def test_input_pandas():
         sillywalk.PCAPredictor(pd.read_csv("tests/students.csv"))
+
+    def test_loading_model_from_npz_file():
+        model1 = sillywalk.PCAPredictor(pl.read_csv("tests/students.csv"))
+        model1.save_npz("model_params.npz")
+        model2 = sillywalk.PCAPredictor.from_npz("model_params.npz")
+
+        assert model1.pca_columns == model2.pca_columns
+        assert all(model1.pca_eigenvalues == model2.pca_eigenvalues)
 
     def test_simple_constraints():
         model = sillywalk.PCAPredictor(df_students)
@@ -117,31 +125,16 @@ def collection_of_tests(df_students, math, pd, pl, pytest, sillywalk):
 def _(pl, sillywalk):
     data = pl.read_csv("tests/Fourier.csv")
 
-    # Select all numeric columns
-    # data.select(pl.selectors.numeric())
     model_gait = sillywalk.PCAPredictor(data)
 
-    model_gait.save_npz("gaitdata.npz")
-    print(len(model_gait.pca_columns))
-    print(len(model_gait.columns))
+    result = model_gait.predict({"Speed": 1.2})
 
-    model_gait.columns
-    return (data,)
+    # create_human_model=True, crates a full HumanModel
+    # and not only an include file
+    sillywalk.anybody.create_model_file(
+        result, "Model.main.any", create_human_model=True
+    )
 
-
-@app.cell
-def _():
-    return
-
-
-@app.cell
-def _():
-    return
-
-
-@app.cell
-def _(data):
-    data
     return
 
 
