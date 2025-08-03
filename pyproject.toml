@@ -55,6 +55,7 @@ indent-style = "space"
 [tool.ty.environment]
 python-platform = "win32"
 python-version = "3.13"
+python = ".pixi/envs/default"
 
 
 [tool.typos]

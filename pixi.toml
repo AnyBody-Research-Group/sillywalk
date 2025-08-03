@@ -31,7 +31,6 @@ jinja2 = "*"
 [feature.test.dependencies]
 pytest = ">=6"
 pytest-cov = "*"
-ty = "*"
 marimo = ">=0.13.6,<0.15"
 nodejs = "*"
 polars = "*"
@@ -56,6 +55,7 @@ hatch = "*"
 build-wheel = "python -m build --no-isolation ."
 check-wheel = "twine check dist/*"
 
+
 [feature.lint.dependencies]
 pre-commit = "*"
 insert-license-header = "*"
@@ -65,10 +65,12 @@ prettier = "*"
 taplo = "*"
 pre-commit-hooks = "*"
 typos = "*"
+ty = "*"
 
 [feature.lint.tasks]
 pre-commit-install = "pre-commit install"
-pre-commit-run = "pre-commit run -a"
+lint = "pre-commit run -a"
+typecheck-python = "ty check -q"
 
 [feature.py311.dependencies]
 python = "3.11.*"

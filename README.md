@@ -29,7 +29,6 @@ git clone https://github.com/AnyBody-Research-Group/sillywalk
 cd sillywalk
 
 pixi install
-pixi run pre-commit-install
 pixi run test
 ```
 

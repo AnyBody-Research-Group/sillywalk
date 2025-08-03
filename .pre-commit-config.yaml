@@ -27,10 +27,9 @@ repos:
       # ty
       - id: ty
         name: ty
-        entry: pixi run -e default ty check
+        entry: pixi run -e lint typecheck-python
         language: system
         types: [python]
-        require_serial: true
       # prettier
       - id: prettier
         name: prettier
@@ -66,4 +65,4 @@ repos:
         entry: pixi run -e lint typos --force-exclude
         language: system
         types: [text]
-        require_serial: true
+        require_serial: false
