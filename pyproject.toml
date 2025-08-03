@@ -1,12 +1,12 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.8.4,<0.9.0"]
+build-backend = "uv_build"
 
 [project]
 name = "sillywalk"
 description = "Library for maximum likelihood principal component analysis for AnyBody models"
 authors = [{ name = "Morten Enemark Lund", email = "melund@gmail.com" }]
-dynamic = ["version"]
+version = "1.0.0a0"
 
 classifiers = [
   "Programming Language :: Python :: 3",

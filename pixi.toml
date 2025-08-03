@@ -19,7 +19,7 @@ version = "1.0.0a0"
 build.backend = { name = "pixi-build-python", version = "*" }
 
 [package.host-dependencies]
-hatchling = "*"
+uv-build = "*"
 pip = "*"
 
 [package.run-dependencies]
