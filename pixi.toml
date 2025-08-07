@@ -6,6 +6,8 @@ channels = [
 ]
 platforms = ["win-64", "linux-64", "osx-arm64"]
 preview = ["pixi-build"]
+license = "MIT"
+license-file = "LICENSE"
 
 
 [tasks]

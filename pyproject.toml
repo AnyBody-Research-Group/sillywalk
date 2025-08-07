@@ -8,6 +8,8 @@ description = "Library for maximum likelihood principal component analysis for A
 authors = [{ name = "Morten Enemark Lund", email = "melund@gmail.com" }]
 version = "1.0.0a1"
 
+license = { text = "MIT" }
+
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",

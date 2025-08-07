@@ -79,6 +79,10 @@ print(result)
 
 ### 3. Save and load the model
 
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
 You can save your trained model to a file and load it later to make new predictions without having to re-train it.
 
 ```python
