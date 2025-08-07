@@ -6,20 +6,17 @@ app = marimo.App(width="medium")
 
 @app.cell
 def _():
-    return
-
-
-@app.cell
-def _():
     import math
 
+    import marimo as mo
+    import numpy as np
     import pandas as pd
     import polars as pl
     import pytest
 
     import sillywalk
 
-    return math, pd, pl, pytest, sillywalk
+    return math, mo, np, pd, pl, pytest, sillywalk
 
 
 @app.cell
@@ -117,6 +114,25 @@ def collection_of_tests(df_students, math, pd, pl, pytest, sillywalk):
         assert model1.predict(constr) == pytest.approx(
             model2.predict(constr), nan_ok=True
         )
+
+    return
+
+
+@app.cell
+def _(pl, sillywalk):
+    def test_fourier_decomposition():
+        n_modes = 6
+        driverdata = pl.read_parquet("tests/driver_data.parquet")
+        fourier_coefficients = sillywalk.anybody.compute_fourier_coefficients(
+            driverdata, n_modes
+        )
+
+        assert len(fourier_coefficients.columns) == len(driverdata.columns) * (
+            n_modes * 2 - 1
+        )
+
+        assert driverdata.columns[0] + "_a0" in fourier_coefficients.columns
+        assert driverdata.columns[0] + "_b1" in fourier_coefficients.columns
 
     return
 

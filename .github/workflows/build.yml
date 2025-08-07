@@ -38,7 +38,6 @@ jobs:
           name: conda-artifact
           path: "*.conda"
 
-
   pypi-release:
     name: Publish package to pypi
     if: startsWith(github.ref, 'refs/tags/')
@@ -46,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
-    environment: 
+    environment:
       name: pypi
       url: https://pypi.org/p/sillywalk
     steps:
@@ -57,7 +56,6 @@ jobs:
       - name: Publish package on PyPi
         uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc # v1.12.4
 
-
   conda-release:
     name: Publish package to prefix.dev
     if: startsWith(github.ref, 'refs/tags/')
@@ -65,7 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
-    environment: 
+    environment:
       name: pypi
       url: https://prefix.dev/channels/anybody/packages/sillywalk
     steps:
@@ -76,4 +74,4 @@ jobs:
           name: conda-artifact
           path: .
       - name: Publish conda package
-        run: pixi exec rattler-build upload prefix -c anybody *.conda 
+        run: pixi exec rattler-build upload prefix -c anybody *.conda
