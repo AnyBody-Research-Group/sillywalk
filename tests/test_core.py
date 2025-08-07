@@ -8,7 +8,7 @@ def test_hard():
     import sillywalk  # noqa
 
     version = sillywalk.__version__
-    assert version == "1.0.0a0", f"Expected version to be '1.0.0a0', got {version!r}"
+    assert version == "1.0.0a1", f"Expected version to be '1.0.0a1', got {version!r}"
 
     df = pl.read_csv("tests/students.csv").drop("Subject")
 
