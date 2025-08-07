@@ -50,8 +50,7 @@ marimo-test = "marimo edit tests/test_notebook.py"
 python-build = "*"
 twine = "*"
 wheel = "*"
-hatchling = "*"
-hatch = "*"
+uv-build = "*"
 
 [feature.build.tasks]
 build-wheel = "python -m build --no-isolation ."
