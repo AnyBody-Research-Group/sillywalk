@@ -38,6 +38,8 @@ pandas = "*"
 pyarrow = "*"
 pandas-stubs = "*"
 debugpy = "*"
+altair = "*"
+ruff = "*"
 
 [feature.test.tasks]
 test = "pytest"

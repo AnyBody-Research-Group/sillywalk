@@ -3,8 +3,10 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+import narwhals as nw
 import numpy as np
 from jinja2 import Environment, PackageLoader, Template
+from narwhals.typing import IntoDataFrameT
 
 FOURIER_DATA_RE = re.compile(
     r"(?P<prefix>.+:)?(?P<group>(?P<measure>.+?)(.Pos\[(?P<index>\d)\])?)_(?P<coef>[ab]\d+)"
@@ -13,16 +15,49 @@ FOURIER_DATA_RE = re.compile(
 jinja_env = Environment(loader=PackageLoader("sillywalk"))
 
 
-def calc_anybody_fourier_coefficients(signal, n_modes=6):
+def _anybody_fft(signal, n_modes=6):
     """Calculate the fourier coefficients for a given signal.
-    Returns values which can be used with AnyBody "AnyKinEqFourierDriver" class and the Type=CosSin setting.
+    Returns a (A,B) with values which can be used with AnyBody "AnyKinEqFourierDriver" class and the Type=CosSin setting.
     """
     y = 2 * np.fft.rfft(signal) / signal.size
     # AnyBody's fourier implementation expect a0 to be divided by 2.
-    a = y[0:n_modes].real
-    b = -y[0:n_modes].imag
-    a[0] /= 2  # Adjust a0 to match AnyBody's definition
-    return a, b
+    y[0] /= 2
+    return y.real, -y.imag
+
+
+def compute_fourier_coefficients(
+    df_native: IntoDataFrameT, n_modes=6
+) -> IntoDataFrameT:
+    """Split a dataframe with time series into its 'AnyBody' fourier
+    coefficients. I.e. A,B coefficients which can be used with the 'CosSin'
+    formulation of the AnyBody's `AnyKinEqFourierDriver` class.
+
+    For each column in the dataframe the 2*n_modes-1 coefficients are
+    calculated and returned as new columns in a dataframe with just a single
+    row. The new columns are postfixed with `_a0`, `_a1`, ..., `_a<n>` and `_b1`, ..., `_b<n>`.
+
+    The `_b0` coefficient is not included, as it is always 0.
+
+    Parameters:
+        df_native: The input dataframe containing the signals.
+
+        n_modes: The number of modes to calculate. Defaults to 6 (meaning 2*6-1=11 coefficients per column).
+
+    Returns:
+        A new dataframe with the fourier coefficients.
+    """
+    df = nw.from_native(df_native)
+    out = df.select()
+
+    for col in df.columns:
+        a, b = _anybody_fft(df[col].to_numpy(), n_modes)
+        out = out.with_columns(
+            nw.lit(a[0]).alias(col + "_a0"),
+            *[nw.lit(a[j]).alias(col + "_a" + str(j)) for j in range(1, n_modes)],
+            *[nw.lit(b[j]).alias(col + "_b" + str(j)) for j in range(1, n_modes)],
+        )
+
+    return out.to_native()
 
 
 def _add_new_coefficient(groupdata: dict, coef: str, val: float):
@@ -62,7 +97,6 @@ def _prepare_template_data(data: dict[str, float]) -> dict[str, Any]:
                     "b": [0],
                 }
             _add_new_coefficient(templatedata["fourier_data"][groupname], coef, val)
-
         else:
             templatedata["scalar_data"][key] = val
 
@@ -76,6 +110,13 @@ def create_model_file(
     prepfunc=_prepare_template_data,
     create_human_model: bool = False,
 ):
+    """Create an AnyBody include file from the data dictionary.
+
+    Any keys on the form "DOF:<measure>_<a|b>#", will be created as `AnyKinEqFourierDriver` entries.
+
+
+    """
+
     if template_file is not None:
         template = Template(Path(template_file).read_text())
     else:
