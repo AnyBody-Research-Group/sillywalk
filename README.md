@@ -4,7 +4,7 @@
 [![pypi-version](https://img.shields.io/pypi/v/sillywalk.svg?logo=pypi&logoColor=white&style=flat-square)](https://pypi.org/project/sillywalk)
 [![python-version](https://img.shields.io/pypi/pyversions/sillywalk?logoColor=white&logo=python&style=flat-square)](https://pypi.org/project/sillywalk)
 
-**sillywalk** is a Python library for Maximum Likelihood Principal Component Analysis (ML-PCA). It enables you to build statistical models from data and predict missing values based on observed values. While it is general-purpose, it includes special utilities for working with data from the [AnyBody Modeling System™](https://www.anybodytech.com/), 
+**sillywalk** is a Python library for Maximum Likelihood Principal Component Analysis (ML-PCA). It enables you to build statistical models from data and predict missing values based on observed values. While it is general-purpose, it includes special utilities for working with data from the [AnyBody Modeling System™](https://www.anybodytech.com/),
 
 ## Installation
 
@@ -93,10 +93,9 @@ fourier_df = sillywalk.anybody.compute_fourier_coefficients(df, n_modes=6)
 print(fourier_df)
 ```
 
-
 Each time series column is decomposed into Fourier coefficients (`_a0` to `_a5`, `_b1` to `_b5`).
 
-``` 
+```
 ┌────────────┬────────────┬───────────┬───┬───────────┬───────────┬───────────┐
 │ ...tension ┆ ...tension ┆ ...tensio ┆ … ┆ ...Flexio ┆ ...Flexio ┆ ...Flexio │
 │ _a0        ┆ _a1        ┆ n_a2      ┆   ┆ n_b3      ┆ n_b4      ┆ n_b5      │
@@ -135,4 +134,3 @@ sillywalk.anybody.create_model_file(
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
-
