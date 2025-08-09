@@ -4,7 +4,15 @@
 [![pypi-version](https://img.shields.io/pypi/v/sillywalk.svg?logo=pypi&logoColor=white&style=flat-square)](https://pypi.org/project/sillywalk)
 [![python-version](https://img.shields.io/pypi/pyversions/sillywalk?logoColor=white&logo=python&style=flat-square)](https://pypi.org/project/sillywalk)
 
-**sillywalk** is a Python library for Maximum Likelihood Principal Component Analysis (ML-PCA). It enables you to build statistical models from data and predict missing values based on observed values. While it is general-purpose, it includes special utilities for working with data from the [AnyBody Modeling System™](https://www.anybodytech.com/),
+sillywalk is a Python library for statistical modeling of human motion and anthropometric data with the AnyBody Modeling System. It implements Maximum Likelihood Principal Component Analysis (ML‑PCA) to learn compact, low‑dimensional models from datasets, predict missing or individualized signals from partial inputs, and export those predictions as AnyScript include files that plug directly into AnyBody models.
+
+Key features
+- AnyBody I/O and preprocessing: Post‑process AnyBody time series and convert them to Fourier coefficients compatible with `AnyKinEqFourierDriver`.
+- ML‑PCA modeling and prediction: Fit ML‑PCA models from tabular data, handle missing values naturally, and predict new samples from partial constraints; save/load models to and from `.npz`.
+- AnyBody model generation: Generate templated AnyScript include files (e.g., drivers and optional human model blocks) from predicted Fourier coefficients and anthropometry.
+- Friendly data interfaces: Works with pandas or polars DataFrames and NumPy arrays; installable via PyPI or pixi for reproducible workflows.
+
+See Quick Start below for a minimal end‑to‑end example.
 
 ## Installation
 
