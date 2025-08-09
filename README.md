@@ -26,6 +26,7 @@ pip install sillywalk
 Or with [pixi](https://pixi.sh):
 
 ```bash
+pixi workspace channel add https://repo.prefix.dev/anybody
 pixi install sillywalk
 ```
 
