@@ -7,6 +7,7 @@
 sillywalk is a Python library for statistical modeling of human motion and anthropometric data with the AnyBody Modeling System. It implements Maximum Likelihood Principal Component Analysis (ML‑PCA) to learn compact, low‑dimensional models from datasets, predict missing or individualized signals from partial inputs, and export those predictions as AnyScript include files that plug directly into AnyBody models.
 
 Key features
+
 - AnyBody I/O and preprocessing: Post‑process AnyBody time series and convert them to Fourier coefficients compatible with `AnyKinEqFourierDriver`.
 - ML‑PCA modeling and prediction: Fit ML‑PCA models from tabular data, handle missing values naturally, and predict new samples from partial constraints; save/load models to and from `.npz`.
 - AnyBody model generation: Generate templated AnyScript include files (e.g., drivers and optional human model blocks) from predicted Fourier coefficients and anthropometry.
