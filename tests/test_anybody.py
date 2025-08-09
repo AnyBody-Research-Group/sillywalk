@@ -1,4 +1,3 @@
-import io
 import math
 from pathlib import Path
 
@@ -57,9 +56,11 @@ def test_compute_fourier_coefficients_dataframe():
     coeffs = anybody.compute_fourier_coefficients(df, n_modes=6)
     assert isinstance(coeffs, pl.DataFrame)
     # Expect columns sig_a0, sig_a1..a5, sig_b1..b5
-    expected_cols = ["sig_a0"] + [f"sig_a{j}" for j in range(1, 6)] + [
-        f"sig_b{j}" for j in range(1, 6)
-    ]
+    expected_cols = (
+        ["sig_a0"]
+        + [f"sig_a{j}" for j in range(1, 6)]
+        + [f"sig_b{j}" for j in range(1, 6)]
+    )
     for c in expected_cols:
         assert c in coeffs.columns
     # Check dominant cosine at k=2

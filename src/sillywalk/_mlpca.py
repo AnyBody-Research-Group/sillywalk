@@ -1,9 +1,17 @@
 """
-Created on May 31 2025
+ML‑PCA utilities and a simple PCA-based predictor.
 
-This is John Rasmussen and Morten Enemark Lund's implementation of the sillywalk algorithm.
+This module provides:
+- The PCAPredictor class that selects useful columns, fits a PCA model,
+  predicts full parameter vectors from partial constraints, and converts
+  between primal parameters and principal components.
 
-@author: John Rasmussen and Morten Enemark Lund
+Design notes
+- Only numeric columns participate in PCA. Non-numeric columns are carried
+  through via their mean values in predictions.
+- Columns with too little absolute or relative variance are excluded from PCA.
+- The prediction uses a least-squares KKT system with optional targets in
+  principal-component space.
 """
 
 from collections.abc import Mapping, Sequence
@@ -22,19 +30,43 @@ NumericSequenceOrArray = Sequence[float | int] | NDArray[np.floating | np.intege
 StringSequenceOrArray = Sequence[str] | NDArray[np.str_]
 
 
-def make_all_columns_numeric(df: nw.DataFrame) -> nw.DataFrame:
+def _make_all_columns_numeric(df: nw.DataFrame) -> nw.DataFrame:
+    """Ensure all columns are numeric in a narwhals DataFrame.
+
+    Non-numeric columns are replaced by a column of NaNs with the same name.
+    This keeps the column ordering stable while allowing numeric reductions.
+    """
     return df.with_columns(
         nw.lit(float("nan")).alias(col)
         for col in df.select(~nw.selectors.numeric()).columns
     )
 
 
-def _dataframe_to_dict(df) -> Mapping[str, float | int]:
+def _dataframe_to_dict(df: IntoDataFrame | None) -> Mapping[str, float | int]:
+    """Convert a 1-row DataFrame-like into a flat mapping.
+
+    If df is None, returns an empty mapping.
+    """
+    if df is None:
+        return {}
     out_dict = nw.from_native(df, eager_only=True).to_dict(as_series=False)
     return {k: v[0] for k, v in out_dict.items()}
 
 
 class PCAPredictor:
+    """PCA-based predictor over a subset of columns.
+
+    Workflow
+    1) Fit from a (pandas/polars) DataFrame or other narwhals-supported frame.
+    2) Predict a full parameter mapping given partial constraints.
+    3) Convert between primal parameters and principal components.
+
+    Parameters selected for PCA are decided by two heuristics:
+    - Absolute variance threshold (variance_threshold)
+    - Relative standard deviation threshold (relative_variance_ratio), i.e.
+      std/mean. Columns below either threshold are excluded.
+    """
+
     def __baseinit__(
         self,
         means: NumericSequenceOrArray,
@@ -43,7 +75,8 @@ class PCAPredictor:
         pca_columns: StringSequenceOrArray,
         pca_eigenvectors: NumericSequenceOrArray,
         pca_eigenvalues: NumericSequenceOrArray,
-    ):
+    ) -> None:
+        """Internal initializer used by classmethods and __init__."""
         if isinstance(columns, np.ndarray):
             columns = columns.tolist()
         if isinstance(pca_columns, np.ndarray):
@@ -54,8 +87,10 @@ class PCAPredictor:
         self.columns = list(columns)  # Ensure list for index()
         self.pca_columns = list(pca_columns)  # Ensure list for index()
         self.pca_eigenvectors = np.array(pca_eigenvectors)
-        self.pca_explained_variance_ratio = np.array(pca_eigenvalues) / np.sum(
-            pca_eigenvalues
+        self.pca_explained_variance_ratio = (
+            np.array(pca_eigenvalues) / np.sum(pca_eigenvalues)
+            if np.size(pca_eigenvalues) > 0
+            else np.array([])
         )
         self.pca_low_variance_columns = set(self.columns).difference(self.pca_columns)
 
@@ -70,7 +105,7 @@ class PCAPredictor:
         self.y_opt: NDArray | None = None
 
     def _pca_column_idx(self, column: str) -> int:
-        """Returns the index of a PCA column."""
+        """Return the index of a PCA column in the reduced space."""
         if column not in self.pca_columns:
             raise ValueError(f"Column '{column}' is not a PCA column.")
         if column not in self.columns:
@@ -81,7 +116,8 @@ class PCAPredictor:
     def from_npz(
         cls,
         filename: PathLike,
-    ):
+    ) -> "PCAPredictor":
+        """Load a saved model from a .npz file created by save_npz."""
         data = np.load(filename, allow_pickle=False)
         instance = cls.__new__(cls)
         instance.__baseinit__(
@@ -103,7 +139,8 @@ class PCAPredictor:
         pca_columns: StringSequenceOrArray,
         pca_eigenvectors: NDArray,
         pca_eigenvalues: NDArray,
-    ):
+    ) -> "PCAPredictor":
+        """Construct directly from PCA statistics and components."""
         instance = cls.__new__(cls)
         instance.__baseinit__(
             means=means,
@@ -121,27 +158,19 @@ class PCAPredictor:
         n_components: int | None = None,
         variance_threshold: float = 1e-8,
         relative_variance_ratio: float = 1e-3,
-    ):
+    ) -> None:
+        """Fit a PCA model on columns that pass simple variance screening."""
         df = nw.from_native(data, eager_only=True)
 
-        # Select all numeric columns
-        # df = df.select(nw.selectors.numeric())
-
-        # original_columns = df.columns
-        # low_variance_cols = []
-        # mean_fill_values = {}
-
         columns = np.array(df.columns)
-        df_numeric = make_all_columns_numeric(df)
+        df_numeric = _make_all_columns_numeric(df)
         meanvalues = (
             df_numeric.select(nw.all().mean().fill_null(float("nan")))
             .to_numpy()
             .flatten()
         )
         stdvalues = df_numeric.select(nw.all().std().fill_null(0)).to_numpy().flatten()
-        variances = (
-            df_numeric.select(nw.all().var().fill_null(0)).to_numpy().flatten()
-        )  # variances = df.var().with_columns((~nw.selectors.numeric()).str.to_integer()).fill_null(0).to_numpy().flatten()
+        variances = df_numeric.select(nw.all().var().fill_null(0)).to_numpy().flatten()
         _relative_ratios = stdvalues / (meanvalues + 1e-12)
 
         pca_columns = columns[
@@ -152,9 +181,23 @@ class PCAPredictor:
         ]
         df_reduced = df.select(pca_columns)
 
-        X_scaled = StandardScaler().fit_transform(df_reduced)
+        # Handle the edge-case of zero selected features gracefully
+        if len(pca_columns) == 0:
+            self.__baseinit__(
+                means=meanvalues,
+                stds=stdvalues,
+                columns=columns,
+                pca_columns=pca_columns,
+                pca_eigenvectors=np.zeros((0, 0), dtype=float),
+                pca_eigenvalues=np.zeros((0,), dtype=float),
+            )
+            return
+
+        X = df_reduced.to_numpy()
+        X_scaled = StandardScaler().fit_transform(X)
 
         if n_components is None:
+            # Number of non-zero components is limited by rank of X
             n_components = PCA().fit(X_scaled).n_components_
 
         pca = PCA(n_components=n_components)
@@ -169,18 +212,28 @@ class PCAPredictor:
             pca_eigenvalues=pca.explained_variance_,
         )
 
-    def _drop_parallel_constraints(self, B: NDArray, d: dict[str, float]) -> tuple:
+    def _drop_parallel_constraints(
+        self, B: NDArray, d: dict[str, float]
+    ) -> tuple[NDArray, dict[str, float]]:
+        """Drop linearly dependent constraints (parallel or anti-parallel rows).
+
+        Rows i and j are considered collinear if |cos(theta)| ~ 1, i.e.
+        |<b_i, b_j>| ≈ ||b_i||·||b_j||.
+        """
         drop: list[str] = []
         for i in range(B.shape[0]):
             for j in range(i + 1, B.shape[0]):
                 inner_product = np.inner(B[i], B[j])
                 norm_i = np.linalg.norm(B[i])
                 norm_j = np.linalg.norm(B[j])
-                if np.abs(inner_product - norm_j * norm_i) < 1e-7:
+                if norm_i == 0 or norm_j == 0:
+                    continue
+                # Detect both parallel and anti-parallel vectors
+                if abs(abs(inner_product) - (norm_j * norm_i)) < 1e-7:
                     drop.append(list(d)[j])
         drop = list(set(drop))
         drop_indices = [list(d).index(key) for key in drop]
-        B_new = np.delete(B, drop_indices, axis=0)
+        B_new = np.delete(B, drop_indices, axis=0) if drop_indices else B
         d_new = {k: v for k, v in d.items() if k not in drop}
         return B_new, d_new
 
@@ -189,6 +242,16 @@ class PCAPredictor:
         constraints: Mapping[str, float | int] | IntoDataFrame | None = None,
         target_pcs: NDArray | None = None,
     ) -> dict[str, float | int]:
+        """Predict a full parameter vector given partial constraints.
+
+        constraints: mapping or 1-row DataFrame containing values for a
+          subset of PCA columns. Non-PCA columns cannot be constrained.
+        target_pcs: optional target values in PC space to bias the solution.
+        """
+        if constraints is None:
+            warn("No constraints provided. Returning column means.")
+            return dict(zip(self.columns, self.means.tolist()))
+
         if not isinstance(constraints, Mapping):
             constraints = _dataframe_to_dict(constraints)
 
@@ -206,7 +269,6 @@ class PCAPredictor:
                 f"Constraint cannot be applied to excluded low-variance columns: {low_variance_constraints}"
             )
 
-        # constraint_indices = [self.pca_columns.get_loc(var) for var in constraint_map.keys()]
         constraint_indices = np.array(
             [
                 self._pca_column_idx(var)
@@ -215,7 +277,7 @@ class PCAPredictor:
             ]
         )
 
-        standardized_constraints = {}
+        standardized_constraints: dict[str, float] = {}
         for var in constraints:
             if var not in self.pca_columns:
                 raise ValueError(
@@ -223,19 +285,19 @@ class PCAPredictor:
                 )
             idx = self._pca_column_idx(var)
             standardized_constraints[var] = (
-                constraints[var] - self._pca_means[idx]
-            ) / self._pca_stds[idx]
-
-        # standardized_constraints = [
-        #     (val - self._mean_vec[i]) / self._std_vec[i] for i, val in zip(constraint_indices, constraint_map.values())
-        # ]
+                float(constraints[var]) - float(self._pca_means[idx])
+            ) / float(self._pca_stds[idx])
 
         B = self.pca_eigenvectors.T[constraint_indices, :]
         d = {i: standardized_constraints[i] for i in standardized_constraints}
 
         B, d = self._drop_parallel_constraints(B, d)
         p = B.shape[0]
-        m = self.pca_eigenvectors.T.shape[1]
+        m = self.pca_eigenvectors.T.shape[1] if self.pca_eigenvectors.size else 0
+
+        if m == 0:
+            # No PCA features: return means
+            return dict(zip(self.columns, self.means.tolist()))
 
         if target_pcs is None:
             target_pcs = np.zeros(m)
@@ -249,7 +311,7 @@ class PCAPredictor:
         K[m:, :m] = B
 
         sol, *_ = np.linalg.lstsq(K, rhs, rcond=None)
-        y_opt = sol[:m] + target_pcs  # TODO understand why we add the target_pcs here
+        y_opt = sol[:m] + target_pcs  # Bias by target PCs
 
         x_hat_standardized = self.pca_eigenvectors.T @ y_opt
         x_hat_original = x_hat_standardized * self._pca_stds + self._pca_means
@@ -266,17 +328,19 @@ class PCAPredictor:
     def parameters_to_components(
         self, parameters: Mapping[str, float | int] | IntoDataFrame
     ) -> list[float | int]:
-        """Returns the principal components associated with a set of primal parameters"""
+        """Return principal components for a given set of primal parameters."""
         if not isinstance(parameters, Mapping):
             param = _dataframe_to_dict(parameters)
         else:
             param = parameters
 
-        normalized_params = np.zeros_like(self._pca_means)
+        normalized_params = np.zeros_like(self._pca_means, dtype=float)
         for i, col in enumerate(self.pca_columns):
             if col not in param:
                 raise ValueError(f"Parameter '{col}' is missing from input data.")
-            normalized_params[i] = (param[col] - self._pca_means[i]) / self._pca_stds[i]
+            normalized_params[i] = (
+                float(param[col]) - float(self._pca_means[i])
+            ) / float(self._pca_stds[i])
 
         pcs = np.dot(self.pca_eigenvectors.T, normalized_params)
         return pcs.tolist()
@@ -284,10 +348,10 @@ class PCAPredictor:
     def components_to_parameters(
         self, principal_components: NumericSequenceOrArray
     ) -> dict[str, float | int]:
-        """Return the primal parameters from a set of principal components."""
+        """Return primal parameters from a set of principal components."""
 
         if not isinstance(principal_components, np.ndarray):
-            principal_components = np.array(principal_components)
+            principal_components = np.array(principal_components, dtype=float)
 
         if len(principal_components) != self.pca_n_components:
             raise ValueError(
@@ -303,7 +367,7 @@ class PCAPredictor:
 
         return full_params
 
-    def save_npz(self, filename: PathLike):
+    def save_npz(self, filename: PathLike) -> None:
         """Save the model to a .npz file."""
         np.savez(
             filename,
@@ -313,5 +377,4 @@ class PCAPredictor:
             pca_columns=self.pca_columns,
             pca_eigenvectors=self.pca_eigenvectors,
             pca_eigenvalues=self.pca_eigenvalues,
-            allow_pickle=False,
         )

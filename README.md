@@ -140,6 +140,39 @@ sillywalk.anybody.create_model_file(
 
 ---
 
+## PCAPredictor
+
+PCAPredictor selects numeric columns with sufficient variance and fits a PCA model. It can:
+
+- Predict all columns from partial constraints on PCA columns using a KKT least‑squares system.
+- Convert between primal parameters and principal components.
+- Persist models to `.npz` files.
+
+Notes
+
+- Constraints on columns excluded from PCA are not allowed and raise ValueError.
+- If no constraints are provided, `predict` returns the column means.
+- If no columns pass variance screening, the model has zero components and `predict` returns means.
+
+Example
+
+```python
+import pandas as pd
+from sillywalk import PCAPredictor
+
+df = pd.DataFrame({
+    "a": [1, 2, 3, 4],
+    "b": [2, 2.5, 3, 3.5],
+    "c": [10, 10, 10, 10],  # excluded (zero variance)
+})
+model = PCAPredictor(df)
+pred = model.predict({"a": 3.2})
+pcs = model.parameters_to_components({k: pred[k] for k in model.pca_columns})
+back = model.components_to_parameters(pcs)
+```
+
+---
+
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
