@@ -17,17 +17,24 @@ See Quick Start below for a minimal end‑to‑end example.
 
 ## Installation
 
-Install from PyPI:
+With [pixi](https://pixi.sh):
+
+```bash
+pixi workspace channel add https://repo.prefix.dev/anybody
+pixi add sillywalk
+```
+
+or from PyPI:
 
 ```bash
 pip install sillywalk
 ```
 
-Or with [pixi](https://pixi.sh):
+or with conda:
 
 ```bash
-pixi workspace channel add https://repo.prefix.dev/anybody
-pixi install sillywalk
+conda create -n sillywalk -c conda-forge -c https://repo.prefix.dev/anybody sillywalk
+conda activate sillywalk
 ```
 
 ### Developer Setup
