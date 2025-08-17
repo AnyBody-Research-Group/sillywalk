@@ -9188,7 +9188,7 @@ packages:
   timestamp: 1748804951958
 - conda: .
   name: sillywalk
-  version: 1.0.0a2
+  version: 1.0.0a3
   build: pyh4616a5c_0
   subdir: noarch
   depends:
@@ -9199,7 +9199,7 @@ packages:
   - python
   - python *
   input:
-    hash: 131d951336ec98da166bf7cb688164d528dda6f2a0a49c75a3f05ef5c0526844
+    hash: dc7170de8f2e9fa1bb2e5ddf67e7d640efd444d3412fdc05e4c890639ac391c5
     globs: []
 - conda: https://prefix.dev/conda-forge/noarch/six-1.17.0-pyhe01879c_1.conda
   sha256: 458227f759d5e3fcec5d9b7acce54e10c9e1f4f4b7ec978f3bfd54ce4ee9853d
