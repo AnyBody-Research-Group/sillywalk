@@ -155,7 +155,8 @@ class PCAPredictor:
     def __init__(
         self,
         data: IntoDataFrameT,
-        n_components: int | None = None,
+        n_components: float | int | None = 0.99,
+        svd_solver: str = "auto",
         variance_threshold: float = 1e-8,
         relative_variance_ratio: float = 1e-3,
     ) -> None:
@@ -196,12 +197,13 @@ class PCAPredictor:
         X = df_reduced.to_numpy()
         X_scaled = StandardScaler().fit_transform(X)
 
-        if n_components is None:
-            # Number of non-zero components is limited by rank of X
-            n_components = PCA().fit(X_scaled).n_components_
+        # if n_components is None:
+        #     # Number of non-zero components is limited by rank of X
+        #     n_components = PCA(n_components='mle').fit(X_scaled).n_components_
 
-        pca = PCA(n_components=n_components)
+        pca = PCA(n_components=n_components, svd_solver=svd_solver)
         pca.fit(X_scaled)
+        n_components = pca.n_components_
 
         self.__baseinit__(
             means=meanvalues,
