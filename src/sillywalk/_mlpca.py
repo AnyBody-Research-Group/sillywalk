@@ -15,7 +15,9 @@ Design notes
 """
 
 from collections.abc import Mapping, Sequence
+from io import BytesIO
 from os import PathLike
+from typing import IO
 from warnings import warn
 
 import narwhals as nw
@@ -113,34 +115,28 @@ class PCAPredictor:
         return self.pca_columns.index(column)
 
     @classmethod
-    def from_npz(
+    def from_pca_data(
         cls,
-        filename: PathLike,
+        filename: PathLike | None = None,
+        means: NumericSequenceOrArray | None = None,
+        stds: NumericSequenceOrArray | None = None,
+        columns: StringSequenceOrArray | None = None,
+        pca_columns: StringSequenceOrArray | None = None,
+        pca_eigenvectors: NDArray | None = None,
+        pca_eigenvalues: NDArray | None = None,
     ) -> "PCAPredictor":
-        """Load a saved model from a .npz file created by save_npz."""
-        data = np.load(filename, allow_pickle=False)
-        instance = cls.__new__(cls)
-        instance.__baseinit__(
-            means=data["means"],
-            stds=data["stds"],
-            columns=data["columns"],
-            pca_columns=data["pca_columns"],
-            pca_eigenvectors=data["pca_eigenvectors"],
-            pca_eigenvalues=data["pca_eigenvalues"],
-        )
-        return instance
+        """Load a saved model from a .npz file created by export_pca_data."""
+        if filename is not None:
+            data = np.load(filename, allow_pickle=False)
+            means = data["means"]
+            stds = data["stds"]
+            columns = data["columns"]
+            pca_columns = data["pca_columns"]
+            pca_eigenvectors = data["pca_eigenvectors"]
+            pca_eigenvalues = data["pca_eigenvalues"]
+        if means is None or stds is None or columns is None or pca_columns is None:
+            raise ValueError("Missing required PCA data.")
 
-    @classmethod
-    def from_pca_values(
-        cls,
-        means: NumericSequenceOrArray,
-        stds: NumericSequenceOrArray,
-        columns: StringSequenceOrArray,
-        pca_columns: StringSequenceOrArray,
-        pca_eigenvectors: NDArray,
-        pca_eigenvalues: NDArray,
-    ) -> "PCAPredictor":
-        """Construct directly from PCA statistics and components."""
         instance = cls.__new__(cls)
         instance.__baseinit__(
             means=means,
@@ -369,10 +365,20 @@ class PCAPredictor:
 
         return full_params
 
-    def save_npz(self, filename: PathLike) -> None:
-        """Save the model to a .npz file."""
-        np.savez(
-            filename,
+    def export_pca_data(self, filename: PathLike | None = None) -> None | IO[bytes]:
+        """Save the model to a .npz file, which can later be loaded with
+        `sillywalk.PCAPredictor.from_pca_data(filename)`.
+
+        If filename is None, return an in-memory buffer.
+        """
+
+        if filename is None:
+            fh = BytesIO()
+        else:
+            fh = filename
+
+        np.savez_compressed(
+            fh,
             means=self.means,
             stds=self.stds,
             columns=self.columns,
@@ -380,3 +386,7 @@ class PCAPredictor:
             pca_eigenvectors=self.pca_eigenvectors,
             pca_eigenvalues=self.pca_eigenvalues,
         )
+
+        if filename is None:
+            fh.seek(0)
+            return fh

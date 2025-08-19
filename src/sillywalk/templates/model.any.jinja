@@ -12,14 +12,28 @@ Main =
 
   #include "<ANYBODY_PATH_BODY>/HumanModel.any"
 
-  AnyBodyStudy Study =
+  AnyKinStudy Study =
   {
      AnyFolder& BodyModel = Main.HumanModel.BodyModel;
      AnyFolder& Drivers = Main.PCA_drivers;
      Gravity = {0, 0, -9.81};
      tStart = 0;
-     tEnd = 1/Main.PCA_drivers.Freq + 1/(Main.PCA_drivers.Freq*Main.PCA_drivers.nStep);
+     tEnd = Main.PCA_drivers.Period + Main.PCA_drivers.Period/nStep;
   };
+
+  // Simple correction for pelvis position. The more correct way of doing this
+  // would be to run the simulation, note the lowest foot position and add
+  // that value to the pelvis position.
+  Main.PCA_drivers.JointsAndDrivers.Trunk_PelvisPosY_Pos_0 = {
+    a0_offset = (Main.HumanModel.Anthropometrics.SegmentDimensions.Right.ThighLength
+    + Main.HumanModel.Anthropometrics.SegmentDimensions.Right.ShankLength
+    +Main.HumanModel.Anthropometrics.SegmentDimensions.Right.FootHeight
+    + Main.HumanModel.Anthropometrics.SegmentDimensions.PelvisHeight);
+
+    Main.HumanModel.Mannequin.Posture.PelvisPosY = a0_offset;
+  };
+
+
 
 {% endif%}
 
@@ -76,7 +90,7 @@ Main.ModelSetup.SubjectSpecificData =
 {% for name, obj in fourier_data.items() if obj.prefix == "DOF:" %}
 {%- if loop.first %}
 AnyFolder PCA_drivers = {
-  AnyVar Freq =  DesignVar({{scalar_data["omega"]}}/(2*pi));
+  AnyVar Period =  DesignVar({{scalar_data["T"]}});
 
   AnyMechObjectExcluder ExlucdeRhythms =
   {
@@ -95,7 +109,7 @@ AnyFolder PCA_drivers = {
 {%- endif %}
     AnyKinEqFourierDriver {{name}} = {
       Type = CosSin;
-      Freq = ..Freq;
+      Freq = 1/..Period;
       CType = {Hard};
       Reaction.Type = {Off};
       MeasureOrganizer = { {{- obj.index -}} };

@@ -219,9 +219,9 @@ def _prepare_template_data(data: dict[str, float]) -> dict[str, Any]:
     return templatedata
 
 
-def create_model_file(
+def write_anyscript(
     data: dict[str, float],
-    targetfile: str | Path = "trialdata.any",
+    targetfile: str | Path | None = "trialdata.any",
     template_file: str | None = None,
     prepfunc=_prepare_template_data,
     create_human_model: bool = False,
@@ -233,7 +233,8 @@ def create_model_file(
 
     Parameters:
         data: Mapping from string keys to numeric values.
-        targetfile: Path to write the rendered AnyScript include.
+        targetfile: Path to write the rendered AnyScript include. If None then
+                    return the rendered template as a string.
         template_file: Optional path to a Jinja template. If omitted, the
                        built-in template is used.
         prepfunc: Function to transform ``data`` to template input structure.
@@ -250,8 +251,11 @@ def create_model_file(
     template_data["create_human_model"] = create_human_model
 
     # Ensure parent directory exists
-    targetpath = Path(targetfile)
-    targetpath.parent.mkdir(parents=True, exist_ok=True)
+    if targetfile is None:
+        return template.render(**template_data)
+    else:
+        targetpath = Path(targetfile)
+        targetpath.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(targetpath, "w", encoding="utf-8") as fh:
-        fh.write(template.render(**template_data))
+        with open(targetpath, "w", encoding="utf-8") as fh:
+            fh.write(template.render(**template_data))

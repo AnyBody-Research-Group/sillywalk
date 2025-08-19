@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.14.16"
+__generated_with = "0.14.17"
 app = marimo.App(width="medium")
 
 
@@ -8,15 +8,13 @@ app = marimo.App(width="medium")
 def _():
     import math
 
-    import marimo as mo
-    import numpy as np
     import pandas as pd
     import polars as pl
     import pytest
 
     import sillywalk
 
-    return math, mo, np, pd, pl, pytest, sillywalk
+    return math, pd, pl, pytest, sillywalk
 
 
 @app.cell
@@ -44,8 +42,8 @@ def collection_of_tests(df_students, math, pd, pl, pytest, sillywalk):
 
     def test_loading_model_from_npz_file():
         model1 = sillywalk.PCAPredictor(pl.read_csv("tests/students.csv"))
-        model1.save_npz("model_params.npz")
-        model2 = sillywalk.PCAPredictor.from_npz("model_params.npz")
+        model1.export_pca_data("model_params.npz")
+        model2 = sillywalk.PCAPredictor.from_pca_data("model_params.npz")
 
         assert model1.pca_columns == model2.pca_columns
         assert all(model1.pca_eigenvalues == model2.pca_eigenvalues)
@@ -92,7 +90,7 @@ def collection_of_tests(df_students, math, pd, pl, pytest, sillywalk):
     def test_initialize_model_from_pca_values():
         """Test that the model can be initialized from a subset"""
         model1 = sillywalk.PCAPredictor(df_students)
-        model2 = sillywalk.PCAPredictor.from_pca_values(
+        model2 = sillywalk.PCAPredictor.from_pca_data(
             means=model1.means,
             stds=model1.stds,
             columns=model1.columns,
@@ -107,8 +105,8 @@ def collection_of_tests(df_students, math, pd, pl, pytest, sillywalk):
 
     def test_save_reload_model():
         model1 = sillywalk.PCAPredictor(df_students)
-        model1.save_npz("model1.npz")
-        model2 = sillywalk.PCAPredictor.from_npz("model1.npz")
+        model1.export_pca_data("model1.npz")
+        model2 = sillywalk.PCAPredictor.from_pca_data("model1.npz")
         constr = {"Age": 24, "Shoesize": 43}
 
         assert model1.predict(constr) == pytest.approx(

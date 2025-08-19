@@ -66,9 +66,9 @@ def test_save_and_load_npz(tmp_path):
     model = PCAPredictor(df)
 
     file = tmp_path / "model.npz"
-    model.save_npz(file)
+    model.export_pca_data(file)
 
-    loaded = PCAPredictor.from_npz(file)
+    loaded = PCAPredictor.from_pca_data(file)
     constraints = {"a": -0.5}
     p1 = model.predict(constraints)
     p2 = loaded.predict(constraints)

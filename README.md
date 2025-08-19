@@ -81,8 +81,8 @@ result = model.predict(constraints)
 ### 3. Save and Load Models
 
 ```python
-model.save_npz("student_model.npz")
-loaded = sillywalk.PCAPredictor.from_npz("student_model.npz")
+model.export_pca_data("student_model.npz")
+loaded = sillywalk.PCAPredictor.from_pca_data("student_model.npz")
 prediction = loaded.predict({"Age": 24, "Shoesize": 43})
 ```
 
@@ -128,7 +128,7 @@ Each time series column is decomposed into Fourier coefficients (`_a0` to `_a5`,
 You can generate AnyScript include files from a dictionary or DataFrame with Fourier coefficients and anthropometric data:
 
 ```python
-sillywalk.anybody.create_model_file(
+sillywalk.anybody.write_anyscript(
     predicted_data,
     targetfile="predicted_motion.any"
 )
@@ -139,7 +139,7 @@ This creates `AnyKinEqFourierDriver` entries for use in AnyBody models.
 #### Example: Complete Human Model
 
 ```python
-sillywalk.anybody.create_model_file(
+sillywalk.anybody.write_anyscript(
     predicted_data,
     targetfile="complete_human_model.any",
     create_human_model=True

@@ -92,7 +92,7 @@ def test_prepare_template_data_and_coefficient_insertion():
     assert grp["b"][0] == 0
 
 
-def test_create_model_file_renders_driver_block(tmp_path: Path):
+def test_write_anyscript_renders_driver_block(tmp_path: Path):
     data = {
         "omega": 2.0 * np.pi,
         "DOF:Main.HumanModel.BodyModel.Interface.Right.ShoulderArm.Jnt.ElbowFlexion.Pos[0]_a0": 0.5,
@@ -100,7 +100,7 @@ def test_create_model_file_renders_driver_block(tmp_path: Path):
         "DOF:Main.HumanModel.BodyModel.Interface.Right.ShoulderArm.Jnt.ElbowFlexion.Pos[0]_b1": -0.2,
     }
     outfile = tmp_path / "trialdata.any"
-    anybody.create_model_file(data, targetfile=outfile)
+    anybody.write_anyscript(data, targetfile=outfile)
 
     text = outfile.read_text(encoding="utf-8")
     assert "AnyKinEqFourierDriver" in text
