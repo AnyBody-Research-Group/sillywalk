@@ -17,18 +17,18 @@ sillywalk = { path = "." }
 
 [package]
 name = "sillywalk"
-version = "1.0.0a3"
+version = "1.0.0a4"
 
 [package.build]
-backend = { name = "pixi-build-python", version = "*" }
+backend = { name = "pixi-build-python", version = ">=0.3.2" }
 channels = [
-    "https://prefix.dev/pixi-build-backends",
-    "https://prefix.dev/conda-forge",
+  "https://prefix.dev/pixi-build-backends",
+  "https://prefix.dev/conda-forge",
 ]
 
 [package.host-dependencies]
 uv-build = "*"
-pip = "*"
+uv = "*"
 
 [package.run-dependencies]
 numpy = "*"
