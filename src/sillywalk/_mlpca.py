@@ -117,7 +117,7 @@ class PCAPredictor:
     @classmethod
     def from_pca_data(
         cls,
-        filename: PathLike | None = None,
+        filename: str | None = None,
         means: NumericSequenceOrArray | None = None,
         stds: NumericSequenceOrArray | None = None,
         columns: StringSequenceOrArray | None = None,
@@ -199,7 +199,6 @@ class PCAPredictor:
 
         pca = PCA(n_components=n_components, svd_solver=svd_solver)
         pca.fit(X_scaled)
-        n_components = pca.n_components_
 
         self.__baseinit__(
             means=meanvalues,
@@ -365,7 +364,9 @@ class PCAPredictor:
 
         return full_params
 
-    def export_pca_data(self, filename: PathLike | None = None) -> None | IO[bytes]:
+    def export_pca_data(
+        self, filename: str | PathLike | None = None
+    ) -> None | IO[bytes]:
         """Save the model to a .npz file, which can later be loaded with
         `sillywalk.PCAPredictor.from_pca_data(filename)`.
 
@@ -374,19 +375,25 @@ class PCAPredictor:
 
         if filename is None:
             fh = BytesIO()
-        else:
-            fh = filename
 
-        np.savez_compressed(
-            fh,
-            means=self.means,
-            stds=self.stds,
-            columns=self.columns,
-            pca_columns=self.pca_columns,
-            pca_eigenvectors=self.pca_eigenvectors,
-            pca_eigenvalues=self.pca_eigenvalues,
-        )
-
-        if filename is None:
+            np.savez_compressed(
+                fh,
+                means=self.means,
+                stds=self.stds,
+                columns=self.columns,
+                pca_columns=self.pca_columns,
+                pca_eigenvectors=self.pca_eigenvectors,
+                pca_eigenvalues=self.pca_eigenvalues,
+            )
             fh.seek(0)
             return fh
+        else:
+            np.savez_compressed(
+                filename,
+                means=self.means,
+                stds=self.stds,
+                columns=self.columns,
+                pca_columns=self.pca_columns,
+                pca_eigenvectors=self.pca_eigenvectors,
+                pca_eigenvalues=self.pca_eigenvalues,
+            )

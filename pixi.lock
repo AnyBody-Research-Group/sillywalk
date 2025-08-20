@@ -9223,7 +9223,7 @@ packages:
   - python *
   license: MIT
   input:
-    hash: 566c74564bb1bec4285aaaab6ac758d3974b6604cc0168aa6369e40c3e4441ad
+    hash: 667c101f6503dcf5aa6c04d6734aec82dead731719c37294803ee10a01d737bb
     globs:
     - pyproject.toml
 - conda: https://prefix.dev/conda-forge/noarch/six-1.17.0-pyhe01879c_1.conda
