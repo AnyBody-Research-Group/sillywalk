@@ -22,10 +22,6 @@ version = "1.0.0a4"
 
 [package.build]
 backend = { name = "pixi-build-python", version = ">=0.3.2" }
-channels = [
-  "https://prefix.dev/pixi-build-backends",
-  "https://prefix.dev/conda-forge",
-]
 
 [package.host-dependencies]
 uv-build = "*"
@@ -40,7 +36,7 @@ jinja2 = "*"
 [feature.test.dependencies]
 pytest = ">=6"
 pytest-cov = "*"
-marimo = ">=0.13.6,<0.15"
+marimo = "*"
 nodejs = "*"
 polars = "*"
 pandas = "*"
@@ -88,11 +84,14 @@ python = "3.11.*"
 python = "3.12.*"
 [feature.py313.dependencies]
 python = "3.13.*"
+# [feature.py314.dependencies]
+# python = "3.14.*"
 
 [environments]
 default = ["py313", "test"]
 py311 = ["py311", "test"]
 py312 = ["py312", "test"]
 py313 = ["py313", "test"]
+# py314 = ["py314", "test"]
 build = ["build"]
 lint = { features = ["lint"], no-default-feature = true }
