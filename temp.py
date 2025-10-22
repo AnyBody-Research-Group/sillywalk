@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import polars as pl
 
 from sillywalk import PCAPredictor
@@ -20,6 +18,5 @@ write_anyscript(result, "walking.main.any", create_human_model=True)
 # This reduces the size compared to the full csv dataset. In this case 31 MB -> 1 MB
 model_gait.export_pca_data("walking.npz")
 
-# The model can then be loadeded directly from the npz file: 
+# The model can then be loadeded directly from the npz file:
 model_gait_loaded = PCAPredictor.from_pca_data("walking.npz")
-
