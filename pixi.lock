@@ -9713,7 +9713,7 @@ packages:
   - python *
   license: MIT
   input:
-    hash: d75b60f237170212fd92b091e839ebb5dd9f392e1ceb336ea241575dda321291
+    hash: 3f3e0d6a9b46130fb441cf50c893df70c991ecdde4bdb470cdc261410f9e5b56
     globs:
     - pyproject.toml
 - conda: https://prefix.dev/conda-forge/noarch/six-1.17.0-pyhe01879c_1.conda
