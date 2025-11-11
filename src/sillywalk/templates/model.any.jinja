@@ -1,6 +1,16 @@
 {% if create_human_model %}
 #include "<ANYBODY_PATH_INSTALLDIR>/AMMR/libdef.any"
 
+{%- if ammr_version and ammr_version[0] >= 4 %}
+#if AMMR_VERSION_MAJOR < 4
+  #ERROR "This model requires AMMR version 4 or higher."
+#endif
+{% elif ammr_version and ammr_version[0] == 3 %}
+#if AMMR_VERSION_MAJOR >= 4
+  #ERROR "This model is configured for AMMR version 3."
+#endif
+{% endif%}
+
 Main =
 {
   #define BM_SCALING _SCALING_XYZ_
@@ -95,14 +105,14 @@ AnyFolder PCA_drivers = {
   AnyMechObjectExcluder ExlucdeRhythms =
   {
     Objects = arrcat(
-    #if AMMR_VERSION_MAJOR >= 4
+    {%- if ammr_version and ammr_version[0] >= 4 %}
       ObjSearch("Main.HumanModel.BodyModel.Trunk.Joints.Lumbar.SpineRhythmDrv*","AnyKinEq"),
       ObjSearch("Main.HumanModel.BodyModel.Trunk.Joints.Cervical.*.rhythm*","AnyKinEq"),
       ObjSearch("Main.HumanModel.BodyModel.*.ShoulderArm.Joints.Scapula*Driver","AnyKinEq"),
       ObjSearch("Main.HumanModel.BodyModel.*.ShoulderArm.Joints.ScapulaTSThoraxNodeDriver","AnyKinEq"),
       ObjSearch("Main.HumanModel.BodyModel.*.ShoulderArm.Joints.ConoideumLigamentDrv","AnyKinEq"),
       ObjSearch("Main.HumanModel.BodyModel.*.ShoulderArm.Joints.SternoClavicularRotationRhythm","AnyKinEq")
-    #else
+    {% else -%}
       ObjSearch("Main.HumanModel.BodyModel.Trunk.JointsLumbar.SpineRhythmDrv*","AnyKinEq"),
       ObjSearch("Main.HumanModel.BodyModel.Trunk.JointsCervicalSpine.*.rhythm*","AnyKinEq"),
       ObjSearch("Main.HumanModel.BodyModel.*.ShoulderArm.Jnt.Clavicula*Driver","AnyKinEq"),
@@ -110,7 +120,7 @@ AnyFolder PCA_drivers = {
       ObjSearch("Main.HumanModel.BodyModel.*.ShoulderArm.Jnt.ScapulaTSThoraxNodeDriver","AnyKinEq"),
       ObjSearch("Main.HumanModel.BodyModel.*.ShoulderArm.Jnt.ConoideumLigamentDrv","AnyKinEq"),
       ObjSearch("Main.HumanModel.BodyModel.*.ShoulderArm.Jnt.SternoClavicularRotationRhythm","AnyKinEq")
-      #endif
+    {%- endif %}
     );
 
   };
