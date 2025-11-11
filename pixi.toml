@@ -1,7 +1,8 @@
 [workspace]
 channels = [
   "https://prefix.dev/pixi-build-backends",
-  "https://prefix.dev/conda-forge",
+  "conda-forge",
+  # "https://prefix.dev/conda-forge",
   "conda-forge/label/ty_alpha",
 ]
 platforms = ["win-64", "linux-64", "osx-arm64"]
@@ -37,6 +38,7 @@ jinja2 = "*"
 pytest = ">=6"
 pytest-cov = "*"
 marimo = "*"
+uv = "*"
 nodejs = "*"
 polars = "*"
 pandas = "*"
@@ -84,14 +86,14 @@ python = "3.11.*"
 python = "3.12.*"
 [feature.py313.dependencies]
 python = "3.13.*"
-# [feature.py314.dependencies]
-# python = "3.14.*"
+[feature.py314.dependencies]
+python = "3.14.*"
 
 [environments]
-default = ["py313", "test"]
+default = ["py314", "test"]
 py311 = ["py311", "test"]
 py312 = ["py312", "test"]
 py313 = ["py313", "test"]
-# py314 = ["py314", "test"]
+py314 = ["py314", "test"]
 build = ["build"]
 lint = { features = ["lint"], no-default-feature = true }

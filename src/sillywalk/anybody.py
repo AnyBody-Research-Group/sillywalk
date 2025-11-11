@@ -219,12 +219,27 @@ def _prepare_template_data(data: dict[str, float]) -> dict[str, Any]:
     return templatedata
 
 
+def _guess_ammr_version(data: dict[str, float]) -> tuple | None:
+    if (
+        "DOF:Main.HumanModel.BodyModel.Trunk.Joints.Lumbar.SacrumPelvis.Pos[0]_a0"
+        in data
+    ):
+        return (4, 0, 0)
+    elif (
+        "DOF:Main.HumanModel.BodyModel.Trunk.JointsLumbar.SacrumPelvisJnt.Pos[0]_a0"
+        in data
+    ):
+        return (3, 0, 0)
+    return None
+
+
 def write_anyscript(
     data: dict[str, float],
     targetfile: str | Path | None = "trialdata.any",
     template_file: str | None = None,
     prepfunc=_prepare_template_data,
     create_human_model: bool = False,
+    ammr_version: tuple | None = None,
 ):
     """Create an AnyBody include file from a dictionary of values.
 
@@ -238,8 +253,14 @@ def write_anyscript(
         template_file: Optional path to a Jinja template. If omitted, the
                        built-in template is used.
         prepfunc: Function to transform ``data`` to template input structure.
+        ammr_version: Optional AMMR version tuple (major, minor, patch). This
+                      is passed to the template, and may be used to customize
+                      output for specific AMMR versions.
         create_human_model: If True, wrap output into a minimal Main model.
     """
+
+    if ammr_version is None:
+        ammr_version = _guess_ammr_version(data)
 
     # Load template
     if template_file is not None:
@@ -249,6 +270,7 @@ def write_anyscript(
 
     template_data = prepfunc(data)
     template_data["create_human_model"] = create_human_model
+    template_data["ammr_version"] = ammr_version
 
     # Ensure parent directory exists
     if targetfile is None:
