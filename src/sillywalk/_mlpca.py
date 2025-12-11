@@ -25,8 +25,7 @@ import numpy as np
 from narwhals.typing import IntoDataFrame, IntoDataFrameT
 from numpy.typing import NDArray
 from sklearn.decomposition import PCA  # type: ignore[import-untyped]
-from sklearn.preprocessing import \
-    StandardScaler  # type: ignore[import-untyped]
+from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
 
 # Type Alias Definition
 NumericSequenceOrArray = Sequence[float | int] | NDArray[np.floating | np.integer]
