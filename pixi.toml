@@ -19,7 +19,7 @@ sillywalk = { path = "." }
 
 [package]
 name = "sillywalk"
-version = "1.0.0a4"
+version = "1.0.0"
 
 [package.build]
 backend = { name = "pixi-build-python", version = ">=0.3.2" }
@@ -78,7 +78,7 @@ ty = "*"
 [feature.lint.tasks]
 pre-commit-install = "pre-commit install"
 lint = "pre-commit run -a"
-typecheck-python = "ty check -q"
+typecheck-python = "ty check"
 
 [feature.py311.dependencies]
 python = "3.11.*"
