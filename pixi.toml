@@ -78,7 +78,7 @@ ty = "*"
 [feature.lint.tasks]
 pre-commit-install = "pre-commit install"
 lint = "pre-commit run -a"
-typecheck-python = "ty check -q"
+typecheck-python = "ty check"
 
 [feature.py311.dependencies]
 python = "3.11.*"

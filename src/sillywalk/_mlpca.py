@@ -25,7 +25,8 @@ import numpy as np
 from narwhals.typing import IntoDataFrame, IntoDataFrameT
 from numpy.typing import NDArray
 from sklearn.decomposition import PCA  # type: ignore[import-untyped]
-from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
+from sklearn.preprocessing import \
+    StandardScaler  # type: ignore[import-untyped]
 
 # Type Alias Definition
 NumericSequenceOrArray = Sequence[float | int] | NDArray[np.floating | np.integer]
@@ -268,7 +269,7 @@ class PCAPredictor:
 
         constraint_indices = np.array(
             [
-                self._pca_column_idx(var)
+                self._pca_column_idx(str(var))
                 for var in constraints
                 if var in self.pca_columns
             ]
@@ -276,6 +277,7 @@ class PCAPredictor:
 
         standardized_constraints: dict[str, float] = {}
         for var in constraints:
+            var = str(var)
             if var not in self.pca_columns:
                 raise ValueError(
                     f"Constraint variable '{var}' is not part of the PCA columns."
