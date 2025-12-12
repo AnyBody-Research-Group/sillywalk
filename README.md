@@ -20,7 +20,6 @@ See Quick Start below for a minimal end‑to‑end example.
 With [pixi](https://pixi.sh):
 
 ```bash
-pixi workspace channel add https://repo.prefix.dev/anybody
 pixi add sillywalk
 ```
 
@@ -33,7 +32,7 @@ pip install sillywalk
 or with conda:
 
 ```bash
-conda create -n sillywalk -c conda-forge -c https://repo.prefix.dev/anybody sillywalk
+conda create -n sillywalk -c conda-forge sillywalk
 conda activate sillywalk
 ```
 
