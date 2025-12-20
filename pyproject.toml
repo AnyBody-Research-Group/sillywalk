@@ -6,7 +6,7 @@ build-backend = "uv_build"
 name = "sillywalk"
 description = "Library for maximum likelihood principal component analysis for AnyBody models"
 authors = [{ name = "Morten Enemark Lund", email = "melund@gmail.com" }]
-version = "1.0.1"
+version = "1.0.2"
 
 license = "MIT"
 license-files = ["LICENSE"]

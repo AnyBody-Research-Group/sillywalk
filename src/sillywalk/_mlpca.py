@@ -168,7 +168,7 @@ class PCAPredictor:
         )
         stdvalues = df_numeric.select(nw.all().std().fill_null(0)).to_numpy().flatten()
         variances = df_numeric.select(nw.all().var().fill_null(0)).to_numpy().flatten()
-        _relative_ratios = stdvalues / (meanvalues + 1e-12)
+        _relative_ratios = abs(stdvalues / (meanvalues + 1e-12))
 
         pca_columns = columns[
             np.logical_and(
