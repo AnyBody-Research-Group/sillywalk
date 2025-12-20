@@ -1,5 +1,9 @@
 {% if create_human_model %}
-#include "<ANYBODY_PATH_INSTALLDIR>/AMMR/libdef.any"
+#ifpathexists "libdef.any"
+  #include "libdef.any"
+#else
+  #include "<ANYBODY_PATH_INSTALLDIR>/AMMR/libdef.any"
+#endif
 
 {%- if ammr_version and ammr_version[0] >= 4 %}
 #if AMMR_VERSION_MAJOR < 4
