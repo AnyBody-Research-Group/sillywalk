@@ -105,7 +105,7 @@ Main.ModelSetup.SubjectSpecificData =
 {% for name, obj in fourier_data.items() if obj.prefix == "DOF:" %}
 {%- if loop.first %}
 AnyFolder PCA_drivers = {
-  AnyVar Period =  DesignVar({{scalar_data["T"]}});
+  AnyVar Period =  DesignVar(1/{{scalar_data["freq"]}});
 
   AnyMechObjectExcluder ExlucdeRhythms =
   {
