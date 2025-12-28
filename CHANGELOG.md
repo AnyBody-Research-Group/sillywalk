@@ -11,7 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Updated the pelvis offset code in the template used for creating AnyBody models.
 
-
 ## [1.1] - 2025-12-25
 
 ### Changed
