@@ -36,17 +36,6 @@ Main =
      nStep = 200;
   };
 
-  // Simple correction for pelvis position. The more correct way of doing this
-  // would be to run the simulation, note the lowest foot position and add
-  // that value to the pelvis position.
-  Main.PCA_drivers.JointsAndDrivers.Trunk_PelvisPosY_Pos_0 = {
-    a0_offset = (Main.HumanModel.Anthropometrics.SegmentDimensions.Right.ThighLength
-    + Main.HumanModel.Anthropometrics.SegmentDimensions.Right.ShankLength
-    +Main.HumanModel.Anthropometrics.SegmentDimensions.Right.FootHeight
-    + Main.HumanModel.Anthropometrics.SegmentDimensions.PelvisHeight);
-
-    Main.HumanModel.Mannequin.Posture.PelvisPosY = a0_offset;
-  };
 
 
 
