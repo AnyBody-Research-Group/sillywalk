@@ -11185,7 +11185,7 @@ packages:
   timestamp: 1748804951958
 - conda: .
   name: sillywalk
-  version: 1.1.0
+  version: 1.1.1
   build: pyh4616a5c_0
   subdir: noarch
   depends:
@@ -11197,7 +11197,7 @@ packages:
   - python *
   license: MIT
   input:
-    hash: cf0453039c8ea76d6d71417e0587d9e24d347913f09d9286eb1882b911dbc9d4
+    hash: 2559baebab065f0ceeef1e8b3fd1ccd1f7be49d12242533804e7e586f88d2c8d
     globs:
     - pyproject.toml
 - conda: https://conda.anaconda.org/conda-forge/noarch/six-1.17.0-pyhe01879c_1.conda
