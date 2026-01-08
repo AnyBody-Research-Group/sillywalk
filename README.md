@@ -56,7 +56,7 @@ See [pixi documentation](https://pixi.sh/latest/) for more info.
 ### 1. Build a Model
 
 ```python
-import pandas as pd
+import polars as pl
 import sillywalk
 
 data = {
@@ -66,7 +66,7 @@ data = {
     "Bodyweight": [70, 80, 60, 55, 85, 65],
     "Shoesize": [42, 44, 39, 38, 45, 40],
 }
-df = pd.DataFrame(data)
+df = pl.DataFrame(data)
 model = sillywalk.PCAPredictor(df)
 ```
 
@@ -124,18 +124,108 @@ Each time series column is decomposed into Fourier coefficients (`_a0` to `_a5`,
 
 ### Generate AnyBody Include Files
 
-You can generate AnyScript include files from a dictionary or DataFrame with Fourier coefficients and anthropometric data:
+You can generate AnyScript include files from a dictionary or DataFrame with Fourier coefficients and/or anthropometric data:
+
+Let us try to generate a model from an anthropometric dataset. First we will download the data
 
 ```python
-sillywalk.anybody.write_anyscript(
-    predicted_data,
-    targetfile="predicted_motion.any"
-)
+>>> df =  pl.read_parquet("https://anybodydatasets.blob.core.windows.net/sillywalk/kso-running/kso-running-fourier-2025-12-28-0.parquet")
+>>> df
+shape: (114, 1_317)
+┌──────────┬────────────┬────────────┬───────────┬───┬───────────┬───────────┬───────────┬───────────┐
+│ freq     ┆ Main.Human ┆ Main.Human ┆ Main.Huma ┆ … ┆ CenterOfM ┆ CenterOfM ┆ CenterOfM ┆ CenterOfM │
+│ ---      ┆ Model.Anth ┆ Model.Anth ┆ nModel.An ┆   ┆ ass.PosZ_ ┆ ass.PosZ_ ┆ ass.PosZ_ ┆ ass.PosZ_ │
+│ f64      ┆ ropometric ┆ ropometric ┆ thropomet ┆   ┆ b2        ┆ b3        ┆ b4        ┆ b5        │
+│          ┆ …          ┆ …          ┆ ric…      ┆   ┆ ---       ┆ ---       ┆ ---       ┆ ---       │
+│          ┆ ---        ┆ ---        ┆ ---       ┆   ┆ f64       ┆ f64       ┆ f64       ┆ f64       │
+│          ┆ f64        ┆ f64        ┆ f64       ┆   ┆           ┆           ┆           ┆           │
+╞══════════╪════════════╪════════════╪═══════════╪═══╪═══════════╪═══════════╪═══════════╪═══════════╡
+│ 1.415094 ┆ 0.164147   ┆ 0.107101   ┆ 0.119941  ┆ … ┆ 0.000389  ┆ -0.000774 ┆ 0.00013   ┆ 0.000322  │
+│ 1.395349 ┆ 0.164147   ┆ 0.107101   ┆ 0.119941  ┆ … ┆ 0.000571  ┆ -0.000821 ┆ 0.000059  ┆ 0.000282  │
+│ 1.382488 ┆ 0.164147   ┆ 0.107101   ┆ 0.119941  ┆ … ┆ -0.000097 ┆ -0.000827 ┆ 0.000112  ┆ 0.000301  │
+│ 1.395349 ┆ 0.164147   ┆ 0.107101   ┆ 0.119941  ┆ … ┆ 0.000522  ┆ -0.000882 ┆ 0.000209  ┆ 0.000253  │
+│ 1.369863 ┆ 0.164147   ┆ 0.107101   ┆ 0.119941  ┆ … ┆ 0.000482  ┆ -0.000949 ┆ 0.000141  ┆ 0.000215  │
+│ …        ┆ …          ┆ …          ┆ …         ┆ … ┆ …         ┆ …         ┆ …         ┆ …         │
+│ 1.321586 ┆ 0.1782     ┆ 0.116442   ┆ 0.13021   ┆ … ┆ 0.000114  ┆ -0.000281 ┆ -0.000132 ┆ 0.000007  │
+│ 1.327434 ┆ 0.1782     ┆ 0.116442   ┆ 0.13021   ┆ … ┆ 0.00038   ┆ -0.000289 ┆ -0.000112 ┆ -0.000051 │
+│ 1.382488 ┆ 0.16105    ┆ 0.107724   ┆ 0.117678  ┆ … ┆ -0.000125 ┆ -0.00011  ┆ 0.000099  ┆ -0.000029 │
+│ 1.428571 ┆ 0.16105    ┆ 0.107724   ┆ 0.117678  ┆ … ┆ -0.000062 ┆ -0.000198 ┆ -0.000006 ┆ -0.00008  │
+│ 1.485149 ┆ 0.16105    ┆ 0.107724   ┆ 0.117678  ┆ … ┆ 0.000787  ┆ -0.000113 ┆ 0.000108  ┆ 0.000021  │
+└──────────┴────────────┴────────────┴───────────┴───┴───────────┴───────────┴───────────┴───────────┘
+```
+
+This dataset contains data from a 114 running subjects, with their 'AnyBody' anthropometic dimensions and fourier coefficients to recreated their running patterns.
+
+Sillywalk can create PCA model from this data set, and we can get a prediction of average person with a height of 1.8m.
+
+```python
+>>> model = sillywalk.PCAPredictor(df)
+>>> predicted_data = model.predict({"Height": 1.8})
+>>> pl.DataFrame(predicted_data)
+shape: (1, 1_317)
+┌──────────┬────────────┬────────────┬───────────┬───┬───────────┬───────────┬───────────┬───────────┐
+│ freq     ┆ Main.Human ┆ Main.Human ┆ Main.Huma ┆ … ┆ CenterOfM ┆ CenterOfM ┆ CenterOfM ┆ CenterOfM │
+│ ---      ┆ Model.Anth ┆ Model.Anth ┆ nModel.An ┆   ┆ ass.PosZ_ ┆ ass.PosZ_ ┆ ass.PosZ_ ┆ ass.PosZ_ │
+│ f64      ┆ ropometric ┆ ropometric ┆ thropomet ┆   ┆ b2        ┆ b3        ┆ b4        ┆ b5        │
+│          ┆ …          ┆ …          ┆ ric…      ┆   ┆ ---       ┆ ---       ┆ ---       ┆ ---       │
+│          ┆ ---        ┆ ---        ┆ ---       ┆   ┆ f64       ┆ f64       ┆ f64       ┆ f64       │
+│          ┆ f64        ┆ f64        ┆ f64       ┆   ┆           ┆           ┆           ┆           │
+╞══════════╪════════════╪════════════╪═══════════╪═══╪═══════════╪═══════════╪═══════════╪═══════════╡
+│ 1.395979 ┆ 0.170115   ┆ 0.112083   ┆ 0.124302  ┆ … ┆ -0.000044 ┆ -0.000206 ┆ -7.6567e- ┆ 0.000057  │
+│          ┆            ┆            ┆           ┆   ┆           ┆           ┆ 8         ┆           │
+└──────────┴────────────┴────────────┴───────────┴───┴───────────┴───────────┴───────────┴───────────┘
+```
+
+Sillywalk can then create an AnyBody model for us using this data:
+
+```
+>>> sillywalk.anybody.write_anyscript(
+...     predicted_data,
+...     targetfile="predicted_motion.any"
+... )
 ```
 
 This creates `AnyKinEqFourierDriver` entries for use in AnyBody models.
 
+```anyscript
+
+Main.HumanModel.Anthropometrics =
+{
+  BodyMass = 75.61897598069909;
+  BodyHeight = 1.8;
+};
+
+Main.HumanModel.Anthropometrics.SegmentDimensions =
+{
+  PelvisWidth = DesignVar(0.17011475699044465);
+  PelvisHeight = DesignVar(0.11208281142857143);
+  PelvisDepth = DesignVar(0.12430194406161754);
+
+...
+
+
+AnyFolder PCA_drivers = {
+  AnyVar Period =  DesignVar(1/1.3959786246912738);
+
+  AnyFolder JointsAndDrivers = {
+    AnyKinEqFourierDriver Trunk_PelvisPosX_Pos_0 = {
+      Type = CosSin;
+      Freq = 1/..Period;
+      CType = {Hard};
+      Reaction.Type = {Off};
+      MeasureOrganizer = {0};
+      AnyKinMeasure &m = Main.HumanModel.BodyModel.Main.HumanModel.BodyModel.Interface.Trunk.PelvisPosX;
+      AnyVar a0_offset ??= DesignVar(0.0);
+      A = {{  8.623540080091557e-10 + a0_offset, 0.00017990165903964024, 0.011945580192769307, -0.00013312081080007037, 0.00041700269239085025, -7.518299551487054e-05,  }};
+      B = {{ 0, 0.0004029987590162868, -0.010429170745175874, 0.00024439360060977196, 0.0003970888221702516, 5.258816436360581e-05,  }};
+    };
+    ...
+
+```
+
 #### Example: Complete Human Model
+
+Sillywalk will by default generate 'anyscript' files with antrhopometics and drivers which can be included in other models. But it is also possible to create a complete standalone model.
 
 ```python
 sillywalk.anybody.write_anyscript(
@@ -145,7 +235,18 @@ sillywalk.anybody.write_anyscript(
 )
 ```
 
----
+or using a jinja template for complete control:
+
+```python
+sillywalk.anybody.write_anyscript(
+    predicted_data,
+    targetfile="complete_human_model.any",
+    template="MyModel.any.jinja",
+    create_human_model=True
+)
+```
+
+See the [template sillywalk](https://github.com/AnyBody-Research-Group/sillywalk/blob/main/src/sillywalk/templates/model.any.jinja) uses as example.
 
 ## PCAPredictor
 
@@ -164,10 +265,10 @@ Notes
 Example
 
 ```python
-import pandas as pd
+import polars as pl
 from sillywalk import PCAPredictor
 
-df = pd.DataFrame({
+df = pl.DataFrame({
     "a": [1, 2, 3, 4],
     "b": [2, 2.5, 3, 3.5],
     "c": [10, 10, 10, 10],  # excluded (zero variance)
