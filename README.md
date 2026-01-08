@@ -126,7 +126,6 @@ Each time series column is decomposed into Fourier coefficients (`_a0` to `_a5`,
 
 You can generate AnyScript include files from a dictionary or DataFrame with Fourier coefficients and/or anthropometric data:
 
-
 Let us try to generate a model from an anthropometric dataset. First we will download the data
 
 ```python
@@ -154,9 +153,10 @@ shape: (114, 1_317)
 │ 1.485149 ┆ 0.16105    ┆ 0.107724   ┆ 0.117678  ┆ … ┆ 0.000787  ┆ -0.000113 ┆ 0.000108  ┆ 0.000021  │
 └──────────┴────────────┴────────────┴───────────┴───┴───────────┴───────────┴───────────┴───────────┘
 ```
-This dataset contains data from a 114 running subjects, with their 'AnyBody' anthropometic dimensions and fourier coefficients to recreated their running patterns. 
 
-Sillywalk can create PCA model from this data set, and we can get a prediction of average person with a height of 1.8m. 
+This dataset contains data from a 114 running subjects, with their 'AnyBody' anthropometic dimensions and fourier coefficients to recreated their running patterns.
+
+Sillywalk can create PCA model from this data set, and we can get a prediction of average person with a height of 1.8m.
 
 ```python
 >>> model = sillywalk.PCAPredictor(df)
@@ -176,9 +176,9 @@ shape: (1, 1_317)
 └──────────┴────────────┴────────────┴───────────┴───┴───────────┴───────────┴───────────┴───────────┘
 ```
 
-Sillywalk can then create an AnyBody model for us using this data: 
+Sillywalk can then create an AnyBody model for us using this data:
 
-``` 
+```
 >>> sillywalk.anybody.write_anyscript(
 ...     predicted_data,
 ...     targetfile="predicted_motion.any"
@@ -186,7 +186,6 @@ Sillywalk can then create an AnyBody model for us using this data:
 ```
 
 This creates `AnyKinEqFourierDriver` entries for use in AnyBody models.
-
 
 ```anyscript
 
@@ -226,8 +225,7 @@ AnyFolder PCA_drivers = {
 
 #### Example: Complete Human Model
 
-Sillywalk will by default generate 'anyscript' files with antrhopometics and drivers which can be included in other models. But it is also possible to create a complete standalone model. 
-
+Sillywalk will by default generate 'anyscript' files with antrhopometics and drivers which can be included in other models. But it is also possible to create a complete standalone model.
 
 ```python
 sillywalk.anybody.write_anyscript(
@@ -237,9 +235,9 @@ sillywalk.anybody.write_anyscript(
 )
 ```
 
-or using a jinja template for complete control: 
+or using a jinja template for complete control:
 
-```python 
+```python
 sillywalk.anybody.write_anyscript(
     predicted_data,
     targetfile="complete_human_model.any",
@@ -249,7 +247,6 @@ sillywalk.anybody.write_anyscript(
 ```
 
 See the [template sillywalk](https://github.com/AnyBody-Research-Group/sillywalk/blob/main/src/sillywalk/templates/model.any.jinja) uses as example.
-
 
 ## PCAPredictor
 
