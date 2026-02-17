@@ -12,6 +12,8 @@ Design notes
 - Columns with too little absolute or relative variance are excluded from PCA.
 - The prediction uses a least-squares KKT system with optional targets in
   principal-component space.
+- Yeo-Johnson scaling added by JR 2026-02-06 to handle nonlinear dependencies 
+  between columns.
 """
 
 from collections.abc import Mapping, Sequence
@@ -25,11 +27,41 @@ import numpy as np
 from narwhals.typing import IntoDataFrame, IntoDataFrameT
 from numpy.typing import NDArray
 from sklearn.decomposition import PCA  # type: ignore[import-untyped]
-from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
+from sklearn.preprocessing import StandardScaler, PowerTransformer  # type: ignore[import-untyped]
 
 # Type Alias Definition
 NumericSequenceOrArray = Sequence[float | int] | NDArray[np.floating | np.integer]
 StringSequenceOrArray = Sequence[str] | NDArray[np.str_]
+
+
+# ---------------------------------------------------------------------
+# Optional per-column monotone transform (Yeo–Johnson)
+# We implement scalar forward/inverse so we can transform ONLY constrained
+# columns at prediction time (constraints can be any subset).
+# ---------------------------------------------------------------------
+
+def _yeo_johnson_forward(x: float, lmbda: float) -> float:
+    """Yeo–Johnson forward transform (matches sklearn definition)."""
+    if x >= 0:
+        if abs(lmbda) < 1e-12:
+            return float(np.log(x + 1.0))
+        return float(((x + 1.0) ** lmbda - 1.0) / lmbda)
+    # x < 0
+    if abs(lmbda - 2.0) < 1e-12:
+        return float(-np.log(-x + 1.0))
+    return float(-(((-x + 1.0) ** (2.0 - lmbda) - 1.0) / (2.0 - lmbda)))
+
+
+def _yeo_johnson_inverse(y: float, lmbda: float) -> float:
+    """Inverse Yeo–Johnson transform (matches sklearn definition)."""
+    if y >= 0:
+        if abs(lmbda) < 1e-12:
+            return float(np.exp(y) - 1.0)
+        return float((lmbda * y + 1.0) ** (1.0 / lmbda) - 1.0)
+    # y < 0
+    if abs(lmbda - 2.0) < 1e-12:
+        return float(1.0 - np.exp(-y))
+    return float(1.0 - ((-(2.0 - lmbda) * y + 1.0) ** (1.0 / (2.0 - lmbda))))
 
 
 def _make_all_columns_numeric(df: nw.DataFrame) -> nw.DataFrame:
@@ -96,14 +128,30 @@ class PCAPredictor:
         )
         self.pca_low_variance_columns = set(self.columns).difference(self.pca_columns)
 
+
         self.pca_n_components = len(self.pca_columns)
-        self._pca_means = np.array(
-            [self.means[self.columns.index(col)] for col in self.pca_columns]
-        )
-        self._pca_stds = np.array(
-            [self.stds[self.columns.index(col)] for col in self.pca_columns]
-        )
-        self.pca_eigenvalues = np.array(pca_eigenvalues)
+
+        # Optional monotone marginal transform (currently: Yeo–Johnson)
+        self.transform_name = str(transform_name).lower().strip() if transform_name else "none"
+        self._yj_lambdas = None if yj_lambdas is None else np.array(yj_lambdas, dtype=float)
+
+        # Means/stds used for standardization in the space PCA was fit in.
+        # If a marginal transform was applied before StandardScaler, then these
+        # are the mean/std of the transformed PCA columns (not the raw columns).
+        if pca_pre_means is None or pca_pre_stds is None:
+            self._pca_means = np.array(
+                [self.means[self.columns.index(col)] for col in self.pca_columns],
+                dtype=float,
+            )
+            self._pca_stds = np.array(
+                [self.stds[self.columns.index(col)] for col in self.pca_columns],
+                dtype=float,
+            )
+        else:
+            self._pca_means = np.array(pca_pre_means, dtype=float)
+            self._pca_stds = np.array(pca_pre_stds, dtype=float)
+
+        self.pca_eigenvalues = np.array(pca_eigenvalues, dtype=float)
         self.y_opt: NDArray | None = None
 
     def _pca_column_idx(self, column: str) -> int:
@@ -134,6 +182,14 @@ class PCAPredictor:
             pca_columns = data["pca_columns"]
             pca_eigenvectors = data["pca_eigenvectors"]
             pca_eigenvalues = data["pca_eigenvalues"]
+            transform_name = str(data["transform_name"]) if "transform_name" in data else "none"
+            yj_lambdas = data["yj_lambdas"] if "yj_lambdas" in data else None
+            if transform_name not in {"yeo-johnson", "yeojohnson", "yj"}:
+                yj_lambdas = None
+            elif yj_lambdas is not None and np.size(yj_lambdas) == 0:
+                yj_lambdas = None
+            pca_pre_means = data["pca_pre_means"] if "pca_pre_means" in data else None
+            pca_pre_stds = data["pca_pre_stds"] if "pca_pre_stds" in data else None
         if means is None or stds is None or columns is None or pca_columns is None:
             raise ValueError("Missing required PCA data.")
 
@@ -155,6 +211,7 @@ class PCAPredictor:
         svd_solver: str = "auto",
         variance_threshold: float = 1e-8,
         relative_variance_ratio: float = 1e-3,
+        transform_name: str = "none",
     ) -> None:
         """Fit a PCA model on columns that pass simple variance screening."""
         df = nw.from_native(data, eager_only=True)
@@ -190,8 +247,26 @@ class PCAPredictor:
             )
             return
 
+
         X = df_reduced.to_numpy()
-        X_scaled = StandardScaler().fit_transform(X)
+
+        # Optional marginal transform (monotone, per column)
+        transform_name = str(transform_name).lower().strip() if transform_name else "none"
+        yj_lambdas = None
+        if transform_name in {"yeo-johnson", "yeojohnson", "yj"}:
+            pt = PowerTransformer(method="yeo-johnson", standardize=False)
+            X_t = pt.fit_transform(X)
+            yj_lambdas = pt.lambdas_.copy()
+            transform_name = "yeo-johnson"
+        elif transform_name in {"none", ""}:
+            X_t = X
+            transform_name = "none"
+        else:
+            raise ValueError(f"Unknown transform_name: {transform_name}")
+
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X_t)
+
 
         # if n_components is None:
         #     # Number of non-zero components is limited by rank of X
@@ -282,9 +357,13 @@ class PCAPredictor:
                     f"Constraint variable '{var}' is not part of the PCA columns."
                 )
             idx = self._pca_column_idx(var)
-            standardized_constraints[var] = (
-                float(constraints[var]) - float(self._pca_means[idx])
-            ) / float(self._pca_stds[idx])
+
+            val = float(constraints[var])
+            if self.transform_name in {"yeo-johnson", "yeojohnson", "yj"}:
+                if self._yj_lambdas is None:
+                    raise ValueError("Yeo–Johnson transform requested but lambdas are missing.")
+                val = _yeo_johnson_forward(val, float(self._yj_lambdas[idx]))
+            standardized_constraints[var] = (val - float(self._pca_means[idx])) / float(self._pca_stds[idx])
 
         B = self.pca_eigenvectors.T[constraint_indices, :]
         d = {i: standardized_constraints[i] for i in standardized_constraints}
@@ -312,7 +391,23 @@ class PCAPredictor:
         y_opt = sol[:m] + target_pcs  # Bias by target PCs
 
         x_hat_standardized = self.pca_eigenvectors.T @ y_opt
-        x_hat_original = x_hat_standardized * self._pca_stds + self._pca_means
+
+        x_hat_t = x_hat_standardized * self._pca_stds + self._pca_means
+
+        # Inverse marginal transform back to original units
+        if self.transform_name in {"yeo-johnson", "yeojohnson", "yj"}:
+            if self._yj_lambdas is None:
+                raise ValueError("Yeo–Johnson transform requested but lambdas are missing.")
+            x_hat_original = np.array(
+                [
+                    _yeo_johnson_inverse(float(x_hat_t[i]), float(self._yj_lambdas[i]))
+                    for i in range(len(x_hat_t))
+                ],
+                dtype=float,
+            )
+        else:
+            x_hat_original = x_hat_t
+
         predicted_reduced = dict(zip(self.pca_columns, x_hat_original))
 
         self.y_opt = y_opt
@@ -336,9 +431,13 @@ class PCAPredictor:
         for i, col in enumerate(self.pca_columns):
             if col not in param:
                 raise ValueError(f"Parameter '{col}' is missing from input data.")
-            normalized_params[i] = (
-                float(param[col]) - float(self._pca_means[i])
-            ) / float(self._pca_stds[i])
+
+            val = float(param[col])
+            if self.transform_name in {"yeo-johnson", "yeojohnson", "yj"}:
+                if self._yj_lambdas is None:
+                    raise ValueError("Yeo–Johnson transform requested but lambdas are missing.")
+                val = _yeo_johnson_forward(val, float(self._yj_lambdas[i]))
+            normalized_params[i] = (val - float(self._pca_means[i])) / float(self._pca_stds[i])
 
         pcs = np.dot(self.pca_eigenvectors.T, normalized_params)
         return pcs.tolist()
@@ -356,9 +455,21 @@ class PCAPredictor:
                 f"Wrong number of pca modes. System has {self.pca_n_components} modes. "
             )
 
-        reduced_params = (
-            self.pca_eigenvectors @ principal_components
-        ) * self._pca_stds + self._pca_means
+
+        reduced_t = (self.pca_eigenvectors @ principal_components) * self._pca_stds + self._pca_means
+
+        if self.transform_name in {"yeo-johnson", "yeojohnson", "yj"}:
+            if self._yj_lambdas is None:
+                raise ValueError("Yeo–Johnson transform requested but lambdas are missing.")
+            reduced_params = np.array(
+                [
+                    _yeo_johnson_inverse(float(reduced_t[i]), float(self._yj_lambdas[i]))
+                    for i in range(len(reduced_t))
+                ],
+                dtype=float,
+            )
+        else:
+            reduced_params = reduced_t
         full_params = dict(zip(self.columns, self.means.tolist()))
         for col, val in zip(self.pca_columns, reduced_params.tolist()):
             full_params[col] = val
@@ -385,6 +496,10 @@ class PCAPredictor:
                 pca_columns=self.pca_columns,
                 pca_eigenvectors=self.pca_eigenvectors,
                 pca_eigenvalues=self.pca_eigenvalues,
+                transform_name=self.transform_name,
+                yj_lambdas=self._yj_lambdas if self._yj_lambdas is not None else np.array([]),
+                pca_pre_means=self._pca_means,
+                pca_pre_stds=self._pca_stds,
             )
             fh.seek(0)
             return fh
@@ -397,4 +512,8 @@ class PCAPredictor:
                 pca_columns=self.pca_columns,
                 pca_eigenvectors=self.pca_eigenvectors,
                 pca_eigenvalues=self.pca_eigenvalues,
+                transform_name=self.transform_name,
+                yj_lambdas=self._yj_lambdas if self._yj_lambdas is not None else np.array([]),
+                pca_pre_means=self._pca_means,
+                pca_pre_stds=self._pca_stds,
             )
