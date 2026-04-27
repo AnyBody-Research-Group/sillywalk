@@ -203,3 +203,33 @@ def test_inconsistent_parallel_constraints_raise():
 
     with pytest.raises(ValueError, match="[Ii]nconsistent"):
         model.predict(constraints)
+
+
+def test_explained_variance_ratio_reflects_truncation():
+    # With three strongly collinear features, n_components=1 keeps only a
+    # tiny share of the (already small) total variance lost to truncation.
+    # The ratio must be < 1 and the kept share must be < 1 individually.
+    df = make_truncatable_dataset()
+    model = PCAPredictor(df, n_components=1)
+
+    assert model.pca_explained_variance_ratio.shape == (1,)
+    # Sum is the share of total variance retained; it should reflect
+    # truncation rather than always summing to 1.
+    total_kept = float(np.sum(model.pca_explained_variance_ratio))
+    assert 0.0 < total_kept <= 1.0
+    # On this dataset some variance is genuinely discarded.
+    assert total_kept < 1.0
+
+
+def test_explained_variance_ratio_persisted_in_npz(tmp_path):
+    df = make_truncatable_dataset()
+    model = PCAPredictor(df, n_components=1)
+
+    file = tmp_path / "model.npz"
+    model.export_pca_data(file)
+    loaded = PCAPredictor.from_pca_data(file)
+
+    np.testing.assert_allclose(
+        loaded.pca_explained_variance_ratio,
+        model.pca_explained_variance_ratio,
+    )

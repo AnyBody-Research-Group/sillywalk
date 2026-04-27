@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.14.17"
+__generated_with = "0.18.4"
 app = marimo.App(width="medium")
 
 
@@ -97,6 +97,7 @@ def collection_of_tests(df_students, math, pd, pl, pytest, sillywalk):
             pca_columns=model1.pca_columns,
             pca_eigenvectors=model1.pca_eigenvectors,
             pca_eigenvalues=model1.pca_eigenvalues,
+            pca_explained_variance_ratio=model1.pca_explained_variance_ratio,
         )
         constr = {"Age": 26, "Shoesize": 40}
         assert model1.predict(constr) == pytest.approx(
@@ -148,7 +149,6 @@ def _(pl, sillywalk):
     sillywalk.anybody.create_model_file(
         result, "Model.main.any", create_human_model=True
     )
-
     return
 
 
