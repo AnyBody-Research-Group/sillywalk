@@ -216,24 +216,55 @@ class PCAPredictor:
     def _drop_parallel_constraints(
         self, B: NDArray, d: dict[str, float]
     ) -> tuple[NDArray, dict[str, float]]:
-        """Drop linearly dependent constraints (parallel or anti-parallel rows).
+        """Drop redundant collinear constraints, raising on infeasible pairs.
 
-        Rows i and j are considered collinear if |cos(theta)| ~ 1, i.e.
-        |<b_i, b_j>| ≈ ||b_i||·||b_j||.
+        Rows i and j of B are collinear when ``|cos(theta)| ~ 1``. For two
+        collinear rows the second is redundant only if its right-hand side
+        is consistent with the first, i.e. ``d_j ≈ alpha * d_i`` where
+        ``alpha = <b_i, b_j> / ||b_i||^2`` is the scalar that maps ``b_i``
+        onto ``b_j``. When the values disagree the constraint system is
+        infeasible and silently dropping a row would let ``predict`` return
+        a result that satisfies one constraint while ignoring the other.
         """
+        keys = list(d)
+        cos_tol = 1e-7
+        # Relative tolerance on RHS consistency, scaled by the magnitude of
+        # the values involved so the check works for both small and large d.
+        rhs_rtol = 1e-7
+        rhs_atol = 1e-9
+
         drop: list[str] = []
         for i in range(B.shape[0]):
+            if keys[i] in drop:
+                continue
+            norm_i = float(np.linalg.norm(B[i]))
+            if norm_i == 0:
+                continue
             for j in range(i + 1, B.shape[0]):
-                inner_product = np.inner(B[i], B[j])
-                norm_i = np.linalg.norm(B[i])
-                norm_j = np.linalg.norm(B[j])
-                if norm_i == 0 or norm_j == 0:
+                if keys[j] in drop:
                     continue
-                # Detect both parallel and anti-parallel vectors
-                if abs(abs(inner_product) - (norm_j * norm_i)) < 1e-7:
-                    drop.append(list(d)[j])
-        drop = list(set(drop))
-        drop_indices = [list(d).index(key) for key in drop]
+                norm_j = float(np.linalg.norm(B[j]))
+                if norm_j == 0:
+                    continue
+                inner_product = float(np.inner(B[i], B[j]))
+                # Cosine-based collinearity check (works at any magnitude).
+                if abs(abs(inner_product) / (norm_i * norm_j) - 1.0) >= cos_tol:
+                    continue
+                # b_j = alpha * b_i; check d_j ?= alpha * d_i.
+                alpha = inner_product / (norm_i * norm_i)
+                expected = alpha * d[keys[i]]
+                actual = d[keys[j]]
+                if not np.isclose(actual, expected, rtol=rhs_rtol, atol=rhs_atol):
+                    raise ValueError(
+                        "Inconsistent constraints: "
+                        f"'{keys[i]}' and '{keys[j]}' are collinear in "
+                        "principal-component space but their values are "
+                        "incompatible "
+                        f"(expected {keys[j]} ≈ {expected:g}, got {actual:g})."
+                    )
+                drop.append(keys[j])
+
+        drop_indices = [keys.index(key) for key in drop]
         B_new = np.delete(B, drop_indices, axis=0) if drop_indices else B
         d_new = {k: v for k, v in d.items() if k not in drop}
         return B_new, d_new
