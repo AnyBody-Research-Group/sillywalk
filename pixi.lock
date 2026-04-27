@@ -10779,7 +10779,7 @@ packages:
   timestamp: 1748804951958
 - conda: .
   name: sillywalk
-  version: 1.1.1
+  version: 1.2.0
   build: pyh4616a5c_0
   subdir: noarch
   variants:

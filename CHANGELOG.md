@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-04-27
+
+- **Fix:** `mlpca` — correct principal-component orientation and derive retained component count properly, so projections and reconstructions work after truncation.
+- **Fix:** `mlpca` — detect infeasible collinear constraints and raise a clear `ValueError` instead of silently dropping conflicting constraints.
+- **Fix:** `mlpca` — make `pca_explained_variance_ratio` reflect truncation (sums < 1 when components are dropped) and persist/load it in `.npz` exports.
+- **Fix:** `mlpca` — floor tiny/zero PCA eigenvalues to avoid inf/NaN in the KKT solve, warn when clamping occurs, and rename local variable to `n_components` for clarity.
+- **Tests:** Added regression tests covering zero eigenvalues, truncation round-trips, and infeasible-constraint detection.
+
 ## [1.1.1] - 2025-12-28
 
 - Updated the pelvis offset code in the template used for creating AnyBody models.
