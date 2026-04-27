@@ -187,17 +187,7 @@ def test_pca_n_components_reflects_retained_components():
     assert model.pca_n_components == 1
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Bug: _drop_parallel_constraints removes parallel rows without "
-        "checking whether the corresponding right-hand-side values are "
-        "consistent. Infeasible constraints are silently dropped instead of "
-        "being reported, so predict() satisfies one constraint exactly and "
-        "ignores the conflicting one."
-    ),
-)
-def test_inconsistent_parallel_constraints_not_silently_dropped():
+def test_inconsistent_parallel_constraints_raise():
     # With n_components=1 every row of B is a scalar, so any two constraints
     # on different PCA columns are 'parallel'. Choose values that imply
     # incompatible positions on the single principal component.
@@ -211,11 +201,5 @@ def test_inconsistent_parallel_constraints_not_silently_dropped():
     # mean while b is below its mean is infeasible on the single PC.
     constraints = {"a": a_mean + 1.0, "b": b_mean - 1.0}
 
-    pred = model.predict(constraints)
-
-    # A correct implementation should either raise, warn, or return a
-    # least-squares compromise that satisfies neither constraint exactly.
-    a_satisfied = np.isclose(pred["a"], constraints["a"], atol=1e-6)
-    b_satisfied = np.isclose(pred["b"], constraints["b"], atol=1e-6)
-    assert not (a_satisfied and not b_satisfied)
-    assert not (b_satisfied and not a_satisfied)
+    with pytest.raises(ValueError, match="[Ii]nconsistent"):
+        model.predict(constraints)
