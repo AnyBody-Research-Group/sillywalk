@@ -96,7 +96,11 @@ class PCAPredictor:
         )
         self.pca_low_variance_columns = set(self.columns).difference(self.pca_columns)
 
-        self.pca_n_components = len(self.pca_columns)
+        # Number of retained principal components, not number of input features.
+        # pca_eigenvectors has shape (n_components, n_features).
+        self.pca_n_components = (
+            self.pca_eigenvectors.shape[0] if self.pca_eigenvectors.size else 0
+        )
         self._pca_means = np.array(
             [self.means[self.columns.index(col)] for col in self.pca_columns]
         )
@@ -340,7 +344,9 @@ class PCAPredictor:
                 float(param[col]) - float(self._pca_means[i])
             ) / float(self._pca_stds[i])
 
-        pcs = np.dot(self.pca_eigenvectors.T, normalized_params)
+        # pca_eigenvectors has shape (n_components, n_features); project
+        # standardized features onto principal components.
+        pcs = np.dot(self.pca_eigenvectors, normalized_params)
         return pcs.tolist()
 
     def components_to_parameters(
@@ -356,8 +362,10 @@ class PCAPredictor:
                 f"Wrong number of pca modes. System has {self.pca_n_components} modes. "
             )
 
+        # pca_eigenvectors has shape (n_components, n_features); reconstruct
+        # standardized features from principal-component coordinates.
         reduced_params = (
-            self.pca_eigenvectors @ principal_components
+            self.pca_eigenvectors.T @ principal_components
         ) * self._pca_stds + self._pca_means
         full_params = dict(zip(self.columns, self.means.tolist()))
         for col, val in zip(self.pca_columns, reduced_params.tolist()):

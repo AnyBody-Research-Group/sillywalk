@@ -150,14 +150,6 @@ def make_truncatable_dataset(n=200, seed=1):
     return pd.DataFrame({"a": a, "b": b, "c": c})
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Bug: parameters_to_components projects with pca_eigenvectors.T "
-        "instead of pca_eigenvectors, which only works when no components "
-        "are dropped. With a truncated PCA the shapes do not align."
-    ),
-)
 def test_parameters_to_components_works_with_truncated_pca():
     df = make_truncatable_dataset()
     model = PCAPredictor(df, n_components=1)
@@ -174,16 +166,6 @@ def test_parameters_to_components_works_with_truncated_pca():
     assert len(pcs) == 1
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Bug: components_to_parameters reconstructs with pca_eigenvectors @ pcs "
-        "instead of pca_eigenvectors.T @ pcs. Combined with pca_n_components "
-        "being set to len(pca_columns) instead of the number of retained "
-        "components, callers cannot supply a correctly-sized PC vector when "
-        "the PCA is truncated."
-    ),
-)
 def test_components_to_parameters_accepts_retained_pc_count():
     df = make_truncatable_dataset()
     model = PCAPredictor(df, n_components=1)
@@ -199,14 +181,6 @@ def test_components_to_parameters_accepts_retained_pc_count():
         assert np.isfinite(out[col])
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Bug: pca_n_components is initialised from len(pca_columns), i.e. the "
-        "number of input features, rather than from the number of retained "
-        "components (pca_eigenvectors.shape[0])."
-    ),
-)
 def test_pca_n_components_reflects_retained_components():
     df = make_truncatable_dataset()
     model = PCAPredictor(df, n_components=1)
