@@ -77,6 +77,7 @@ class PCAPredictor:
         pca_columns: StringSequenceOrArray,
         pca_eigenvectors: NumericSequenceOrArray,
         pca_eigenvalues: NumericSequenceOrArray,
+        pca_explained_variance_ratio: NumericSequenceOrArray,
     ) -> None:
         """Internal initializer used by classmethods and __init__."""
         if isinstance(columns, np.ndarray):
@@ -89,10 +90,8 @@ class PCAPredictor:
         self.columns = list(columns)  # Ensure list for index()
         self.pca_columns = list(pca_columns)  # Ensure list for index()
         self.pca_eigenvectors = np.array(pca_eigenvectors)
-        self.pca_explained_variance_ratio = (
-            np.array(pca_eigenvalues) / np.sum(pca_eigenvalues)
-            if np.size(pca_eigenvalues) > 0
-            else np.array([])
+        self.pca_explained_variance_ratio = np.array(
+            pca_explained_variance_ratio, dtype=float
         )
         self.pca_low_variance_columns = set(self.columns).difference(self.pca_columns)
 
@@ -128,6 +127,7 @@ class PCAPredictor:
         pca_columns: StringSequenceOrArray | None = None,
         pca_eigenvectors: NDArray | None = None,
         pca_eigenvalues: NDArray | None = None,
+        pca_explained_variance_ratio: NDArray | None = None,
     ) -> "PCAPredictor":
         """Load a saved model from a .npz file created by export_pca_data."""
         if filename is not None:
@@ -138,7 +138,14 @@ class PCAPredictor:
             pca_columns = data["pca_columns"]
             pca_eigenvectors = data["pca_eigenvectors"]
             pca_eigenvalues = data["pca_eigenvalues"]
-        if means is None or stds is None or columns is None or pca_columns is None:
+            pca_explained_variance_ratio = data["pca_explained_variance_ratio"]
+        if (
+            means is None
+            or stds is None
+            or columns is None
+            or pca_columns is None
+            or pca_explained_variance_ratio is None
+        ):
             raise ValueError("Missing required PCA data.")
 
         instance = cls.__new__(cls)
@@ -149,6 +156,7 @@ class PCAPredictor:
             pca_columns=pca_columns,
             pca_eigenvectors=pca_eigenvectors,
             pca_eigenvalues=pca_eigenvalues,
+            pca_explained_variance_ratio=pca_explained_variance_ratio,
         )
         return instance
 
@@ -191,6 +199,7 @@ class PCAPredictor:
                 pca_columns=pca_columns,
                 pca_eigenvectors=np.zeros((0, 0), dtype=float),
                 pca_eigenvalues=np.zeros((0,), dtype=float),
+                pca_explained_variance_ratio=np.zeros((0,), dtype=float),
             )
             return
 
@@ -211,6 +220,9 @@ class PCAPredictor:
             pca_columns=pca_columns,
             pca_eigenvectors=pca.components_,
             pca_eigenvalues=pca.explained_variance_,
+            # sklearn divides by the *total* variance of the input matrix,
+            # so this correctly reflects information lost to truncation.
+            pca_explained_variance_ratio=pca.explained_variance_ratio_,
         )
 
     def _drop_parallel_constraints(
@@ -413,27 +425,20 @@ class PCAPredictor:
         If filename is None, return an in-memory buffer.
         """
 
+        save_kwargs = dict(
+            means=self.means,
+            stds=self.stds,
+            columns=self.columns,
+            pca_columns=self.pca_columns,
+            pca_eigenvectors=self.pca_eigenvectors,
+            pca_eigenvalues=self.pca_eigenvalues,
+            pca_explained_variance_ratio=self.pca_explained_variance_ratio,
+        )
+
         if filename is None:
             fh = BytesIO()
-
-            np.savez_compressed(
-                fh,
-                means=self.means,
-                stds=self.stds,
-                columns=self.columns,
-                pca_columns=self.pca_columns,
-                pca_eigenvectors=self.pca_eigenvectors,
-                pca_eigenvalues=self.pca_eigenvalues,
-            )
+            np.savez_compressed(fh, **save_kwargs)
             fh.seek(0)
             return fh
         else:
-            np.savez_compressed(
-                filename,
-                means=self.means,
-                stds=self.stds,
-                columns=self.columns,
-                pca_columns=self.pca_columns,
-                pca_eigenvectors=self.pca_eigenvectors,
-                pca_eigenvalues=self.pca_eigenvalues,
-            )
+            np.savez_compressed(filename, **save_kwargs)
