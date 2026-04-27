@@ -425,20 +425,28 @@ class PCAPredictor:
         If filename is None, return an in-memory buffer.
         """
 
-        save_kwargs = dict(
-            means=self.means,
-            stds=self.stds,
-            columns=self.columns,
-            pca_columns=self.pca_columns,
-            pca_eigenvectors=self.pca_eigenvectors,
-            pca_eigenvalues=self.pca_eigenvalues,
-            pca_explained_variance_ratio=self.pca_explained_variance_ratio,
-        )
-
         if filename is None:
             fh = BytesIO()
-            np.savez_compressed(fh, **save_kwargs)
+            np.savez_compressed(
+                fh,
+                means=self.means,
+                stds=self.stds,
+                columns=self.columns,
+                pca_columns=self.pca_columns,
+                pca_eigenvectors=self.pca_eigenvectors,
+                pca_eigenvalues=self.pca_eigenvalues,
+                pca_explained_variance_ratio=self.pca_explained_variance_ratio,
+            )
             fh.seek(0)
             return fh
         else:
-            np.savez_compressed(filename, **save_kwargs)
+            np.savez_compressed(
+                filename,
+                means=self.means,
+                stds=self.stds,
+                columns=self.columns,
+                pca_columns=self.pca_columns,
+                pca_eigenvectors=self.pca_eigenvectors,
+                pca_eigenvalues=self.pca_eigenvalues,
+                pca_explained_variance_ratio=self.pca_explained_variance_ratio,
+            )
