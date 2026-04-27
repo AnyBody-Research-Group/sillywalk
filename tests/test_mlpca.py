@@ -128,3 +128,120 @@ def test_drop_parallel_constraints_internal():
     # Expect to drop some rows
     assert B2.shape[0] < B.shape[0]
     assert len(d2) == B2.shape[0]
+
+
+# ---------------------------------------------------------------------------
+# Regression tests for known algorithmic bugs.
+#
+# Each test below documents an existing defect and is marked xfail(strict=True)
+# so the suite stays green until the bug is fixed. When a fix lands, the
+# strict marker turns the now-passing test into an XPASS failure, signaling
+# that the marker should be removed.
+# ---------------------------------------------------------------------------
+
+
+def make_truncatable_dataset(n=200, seed=1):
+    """Three strongly correlated PCA columns so n_components=1 is meaningful."""
+    rng = np.random.default_rng(seed)
+    t = rng.normal(0.0, 1.0, size=n)
+    a = t + rng.normal(0.0, 0.05, size=n)
+    b = 2.0 * t + 1.0 + rng.normal(0.0, 0.05, size=n)
+    c = -0.5 * t + 3.0 + rng.normal(0.0, 0.05, size=n)
+    return pd.DataFrame({"a": a, "b": b, "c": c})
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "Bug: parameters_to_components projects with pca_eigenvectors.T "
+        "instead of pca_eigenvectors, which only works when no components "
+        "are dropped. With a truncated PCA the shapes do not align."
+    ),
+)
+def test_parameters_to_components_works_with_truncated_pca():
+    df = make_truncatable_dataset()
+    model = PCAPredictor(df, n_components=1)
+
+    # Sanity: the model genuinely truncated.
+    assert model.pca_eigenvectors.shape[0] == 1
+    assert len(model.pca_columns) == 3
+
+    row = df.iloc[0].to_dict()
+    params = {col: float(row[col]) for col in model.pca_columns}
+
+    pcs = model.parameters_to_components(params)
+    # Expected: one PC value per retained component.
+    assert len(pcs) == 1
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "Bug: components_to_parameters reconstructs with pca_eigenvectors @ pcs "
+        "instead of pca_eigenvectors.T @ pcs. Combined with pca_n_components "
+        "being set to len(pca_columns) instead of the number of retained "
+        "components, callers cannot supply a correctly-sized PC vector when "
+        "the PCA is truncated."
+    ),
+)
+def test_components_to_parameters_accepts_retained_pc_count():
+    df = make_truncatable_dataset()
+    model = PCAPredictor(df, n_components=1)
+
+    assert model.pca_eigenvectors.shape[0] == 1
+
+    # Caller supplies one PC value because one component was retained.
+    out = model.components_to_parameters([0.0])
+
+    # All original columns should be present and finite.
+    assert set(out.keys()) == set(model.columns)
+    for col in model.pca_columns:
+        assert np.isfinite(out[col])
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "Bug: pca_n_components is initialised from len(pca_columns), i.e. the "
+        "number of input features, rather than from the number of retained "
+        "components (pca_eigenvectors.shape[0])."
+    ),
+)
+def test_pca_n_components_reflects_retained_components():
+    df = make_truncatable_dataset()
+    model = PCAPredictor(df, n_components=1)
+    assert model.pca_n_components == 1
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "Bug: _drop_parallel_constraints removes parallel rows without "
+        "checking whether the corresponding right-hand-side values are "
+        "consistent. Infeasible constraints are silently dropped instead of "
+        "being reported, so predict() satisfies one constraint exactly and "
+        "ignores the conflicting one."
+    ),
+)
+def test_inconsistent_parallel_constraints_not_silently_dropped():
+    # With n_components=1 every row of B is a scalar, so any two constraints
+    # on different PCA columns are 'parallel'. Choose values that imply
+    # incompatible positions on the single principal component.
+    df = make_truncatable_dataset()
+    model = PCAPredictor(df, n_components=1)
+
+    a_mean = float(model._pca_means[model._pca_column_idx("a")])
+    b_mean = float(model._pca_means[model._pca_column_idx("b")])
+
+    # 'a' and 'b' are positively correlated (b ~ 2a). Demanding a above its
+    # mean while b is below its mean is infeasible on the single PC.
+    constraints = {"a": a_mean + 1.0, "b": b_mean - 1.0}
+
+    pred = model.predict(constraints)
+
+    # A correct implementation should either raise, warn, or return a
+    # least-squares compromise that satisfies neither constraint exactly.
+    a_satisfied = np.isclose(pred["a"], constraints["a"], atol=1e-6)
+    b_satisfied = np.isclose(pred["b"], constraints["b"], atol=1e-6)
+    assert not (a_satisfied and not b_satisfied)
+    assert not (b_satisfied and not a_satisfied)
