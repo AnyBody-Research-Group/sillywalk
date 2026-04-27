@@ -338,25 +338,41 @@ class PCAPredictor:
 
         B, d = self._drop_parallel_constraints(B, d)
         p = B.shape[0]
-        m = self.pca_eigenvectors.T.shape[1] if self.pca_eigenvectors.size else 0
+        # Number of retained principal components (= columns of B).
+        n_components = self.pca_n_components
 
-        if m == 0:
+        if n_components == 0:
             # No PCA features: return means
             return dict(zip(self.columns, self.means.tolist()))
 
         if target_pcs is None:
-            target_pcs = np.zeros(m)
+            target_pcs = np.zeros(n_components)
 
-        rhs = np.zeros(m + p)
-        rhs[m:] = np.array(list(d.values())) - (B @ target_pcs)
+        # Guard against zero or numerically tiny eigenvalues: the KKT system
+        # uses 1/lambda as a prior weight on each component, which would
+        # otherwise produce inf/NaN and silently invalidate the solve. Floor
+        # at a small fraction of the largest eigenvalue.
+        eig = np.asarray(self.pca_eigenvalues, dtype=float)
+        eig_floor = max(np.max(eig) * 1e-12, np.finfo(float).tiny) if eig.size else 0.0
+        if np.any(eig <= eig_floor):
+            warn(
+                "Some retained PCA eigenvalues are zero or numerically tiny; "
+                "flooring them for the KKT solve. This usually indicates "
+                "redundant or degenerate input features.",
+                stacklevel=2,
+            )
+            eig = np.maximum(eig, eig_floor)
 
-        K = np.zeros((m + p, m + p))
-        K[range(m), range(m)] = 1.0 / self.pca_eigenvalues
-        K[:m, m:] = B.T
-        K[m:, :m] = B
+        rhs = np.zeros(n_components + p)
+        rhs[n_components:] = np.array(list(d.values())) - (B @ target_pcs)
+
+        K = np.zeros((n_components + p, n_components + p))
+        K[range(n_components), range(n_components)] = 1.0 / eig
+        K[:n_components, n_components:] = B.T
+        K[n_components:, :n_components] = B
 
         sol, *_ = np.linalg.lstsq(K, rhs, rcond=None)
-        y_opt = sol[:m] + target_pcs  # Bias by target PCs
+        y_opt = sol[:n_components] + target_pcs  # Bias by target PCs
 
         x_hat_standardized = self.pca_eigenvectors.T @ y_opt
         x_hat_original = x_hat_standardized * self._pca_stds + self._pca_means

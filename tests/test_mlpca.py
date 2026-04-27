@@ -233,3 +233,21 @@ def test_explained_variance_ratio_persisted_in_npz(tmp_path):
         loaded.pca_explained_variance_ratio,
         model.pca_explained_variance_ratio,
     )
+
+
+def test_predict_handles_zero_eigenvalue_without_nan():
+    # Force a zero eigenvalue by mutating the fitted model. predict() must
+    # not divide by zero; it should warn and still return finite values.
+    df = make_truncatable_dataset()
+    model = PCAPredictor(df, n_components=2)
+    assert model.pca_n_components >= 2
+
+    model.pca_eigenvalues = model.pca_eigenvalues.copy()
+    model.pca_eigenvalues[-1] = 0.0
+
+    a_mean = float(model._pca_means[model._pca_column_idx("a")])
+    with pytest.warns(UserWarning, match="tiny"):
+        pred = model.predict({"a": a_mean + 0.1})
+
+    for v in pred.values():
+        assert np.isfinite(v)
