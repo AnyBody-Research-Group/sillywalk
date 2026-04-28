@@ -28,6 +28,8 @@ from numpy.typing import NDArray
 from sklearn.decomposition import PCA  # type: ignore[import-untyped]
 from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
 
+from ._transformer_validation import validate_transformer
+
 # Type Alias Definition
 NumericSequenceOrArray = Sequence[float | int] | NDArray[np.floating | np.integer]
 StringSequenceOrArray = Sequence[str] | NDArray[np.str_]
@@ -132,11 +134,18 @@ class PCAPredictor:
         pca_eigenvectors: NDArray | None = None,
         pca_eigenvalues: NDArray | None = None,
         pca_explained_variance_ratio: NDArray | None = None,
+        transformer: Any | None = None,
     ) -> "PCAPredictor":
-        """Load a saved model from a .npz file created by export_pca_data."""
-        transformer = None
+        """Load a saved model from a .npz file created by export_pca_data.
+
+        .. warning::
+            Loading uses ``allow_pickle=True`` to deserialize the fitted
+            transformer object. Only load files from sources you trust;
+            unpickling untrusted data can execute arbitrary code.
+        """
         if filename is not None:
-            # We allow pickle to load the transformer object
+            # We allow pickle to load the transformer object. The caller is
+            # expected to trust the source of the file (see warning above).
             data = np.load(filename, allow_pickle=True)
             means = data["means"]
             stds = data["stds"]
@@ -145,50 +154,23 @@ class PCAPredictor:
             pca_eigenvectors = data["pca_eigenvectors"]
             pca_eigenvalues = data["pca_eigenvalues"]
             pca_explained_variance_ratio = data["pca_explained_variance_ratio"]
+            if "transformer" not in data.files:
+                raise ValueError(
+                    "Saved model is missing the 'transformer' entry. "
+                    "It was likely produced by an incompatible older version; "
+                    "re-export the model with the current code."
+                )
+            transformer_bytes = data["transformer"]
+            transformer = pickle.loads(bytes(transformer_bytes))
         if (
             means is None
             or stds is None
             or columns is None
             or pca_columns is None
             or pca_explained_variance_ratio is None
+            or transformer is None
         ):
-            if "transformer" in data:
-                # Load the pickled transformer
-                transformer_bytes = data["transformer"]
-                # Convert back to bytes if it was saved as a uint8 array or similar
-                if transformer_bytes.dtype == np.uint8:
-                    transformer = pickle.loads(bytes(transformer_bytes))
-                else:
-                    # Fallback for other storage methods (e.g. valid object array)
-                    try:
-                        transformer = pickle.loads(transformer_bytes.item())
-                    except Exception:
-                        # If it's a void numpy type wrapping bytes
-                        transformer = pickle.loads(transformer_bytes.tobytes())
-
-        if means is None or stds is None or columns is None or pca_columns is None:
             raise ValueError("Missing required PCA data.")
-
-        # Legacy/Fallback: If no transformer was saved, reconstruct StandardScaler
-        if transformer is None:
-            col_list = (
-                list(columns) if isinstance(columns, np.ndarray) else list(columns)
-            )
-            pca_col_list = (
-                list(pca_columns)
-                if isinstance(pca_columns, np.ndarray)
-                else list(pca_columns)
-            )
-            indices = [col_list.index(c) for c in pca_col_list]
-
-            # Reconstruct sklearn StandardScaler state
-            # Note: this assumes the original logic used StandardScaler(with_std=True, with_mean=True)
-            transformer = StandardScaler()
-            transformer.mean_ = np.array([means[i] for i in indices])
-            transformer.scale_ = np.array([stds[i] for i in indices])
-            transformer.var_ = transformer.scale_**2
-            transformer.n_features_in_ = len(pca_col_list)  # type: ignore[attr-defined]
-            transformer.n_samples_seen_ = np.int64(1)  # type: ignore[attr-defined]
 
         instance = cls.__new__(cls)
         instance.__baseinit__(
@@ -252,6 +234,7 @@ class PCAPredictor:
         if transformer is None:
             transformer = StandardScaler()
 
+        validate_transformer(transformer, X)
         X_scaled = transformer.fit_transform(X)
 
         # if n_components is None:
