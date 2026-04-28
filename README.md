@@ -279,6 +279,21 @@ pcs = model.parameters_to_components({k: pred[k] for k in model.pca_columns})
 back = model.components_to_parameters(pcs)
 ```
 
+### Advanced: Custom Transformers
+
+By default, `PCAPredictor` uses `StandardScaler` to normalize data. You can provide a custom transformer (e.g., `MinMaxScaler`, `PowerTransformer`, or a `Pipeline`) to control preprocessing.
+
+**Note**: The transformer must operate element-wise or be compatible with partial constraints (e.g., standard scalers, min-max scalers, power transformers) for the prediction logic to work correctly when only some columns are constrained.
+
+```python
+from sklearn.preprocessing import MinMaxScaler
+from sillywalk import PCAPredictor
+
+# Normalize data to [0, 1] range before PCA
+model = PCAPredictor(df, transformer=MinMaxScaler())
+prediction = model.predict({"a": 3.2})
+```
+
 ---
 
 ## License

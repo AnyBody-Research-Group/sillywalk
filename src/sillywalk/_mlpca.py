@@ -14,10 +14,11 @@ Design notes
   principal-component space.
 """
 
+import pickle
 from collections.abc import Mapping, Sequence
 from io import BytesIO
 from os import PathLike
-from typing import IO
+from typing import IO, Any
 from warnings import warn
 
 import narwhals as nw
@@ -25,7 +26,8 @@ import numpy as np
 from narwhals.typing import IntoDataFrame, IntoDataFrameT
 from numpy.typing import NDArray
 from sklearn.decomposition import PCA  # type: ignore[import-untyped]
-from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
+from sklearn.preprocessing import \
+    StandardScaler  # type: ignore[import-untyped]
 
 # Type Alias Definition
 NumericSequenceOrArray = Sequence[float | int] | NDArray[np.floating | np.integer]
@@ -78,6 +80,7 @@ class PCAPredictor:
         pca_eigenvectors: NumericSequenceOrArray,
         pca_eigenvalues: NumericSequenceOrArray,
         pca_explained_variance_ratio: NumericSequenceOrArray,
+        transformer: Any,
     ) -> None:
         """Internal initializer used by classmethods and __init__."""
         if isinstance(columns, np.ndarray):
@@ -89,6 +92,8 @@ class PCAPredictor:
         self.stds = np.array(stds)
         self.columns = list(columns)  # Ensure list for index()
         self.pca_columns = list(pca_columns)  # Ensure list for index()
+        self.transformer = transformer
+
         self.pca_eigenvectors = np.array(pca_eigenvectors)
         self.pca_explained_variance_ratio = np.array(
             pca_explained_variance_ratio, dtype=float
@@ -130,8 +135,10 @@ class PCAPredictor:
         pca_explained_variance_ratio: NDArray | None = None,
     ) -> "PCAPredictor":
         """Load a saved model from a .npz file created by export_pca_data."""
+        transformer = None
         if filename is not None:
-            data = np.load(filename, allow_pickle=False)
+            # We allow pickle to load the transformer object
+            data = np.load(filename, allow_pickle=True)
             means = data["means"]
             stds = data["stds"]
             columns = data["columns"]
@@ -146,7 +153,41 @@ class PCAPredictor:
             or pca_columns is None
             or pca_explained_variance_ratio is None
         ):
+            if "transformer" in data:
+                # Load the pickled transformer
+                transformer_bytes = data["transformer"]
+                # Convert back to bytes if it was saved as a uint8 array or similar
+                if transformer_bytes.dtype == np.uint8:
+                    transformer = pickle.loads(bytes(transformer_bytes))
+                else:
+                    # Fallback for other storage methods (e.g. valid object array)
+                    try:
+                        transformer = pickle.loads(transformer_bytes.item())
+                    except Exception:
+                        # If it's a void numpy type wrapping bytes
+                        transformer = pickle.loads(transformer_bytes.tobytes())
+
+        if means is None or stds is None or columns is None or pca_columns is None:
             raise ValueError("Missing required PCA data.")
+
+        # Legacy/Fallback: If no transformer was saved, reconstruct StandardScaler
+        if transformer is None:
+            col_list = list(columns) if isinstance(columns, np.ndarray) else list(columns)
+            pca_col_list = (
+                list(pca_columns)
+                if isinstance(pca_columns, np.ndarray)
+                else list(pca_columns)
+            )
+            indices = [col_list.index(c) for c in pca_col_list]
+
+            # Reconstruct sklearn StandardScaler state
+            # Note: this assumes the original logic used StandardScaler(with_std=True, with_mean=True)
+            transformer = StandardScaler()
+            transformer.mean_ = np.array([means[i] for i in indices])
+            transformer.scale_ = np.array([stds[i] for i in indices])
+            transformer.var_ = transformer.scale_**2
+            transformer.n_features_in_ = len(pca_col_list)
+            transformer.n_samples_seen_ = np.int64(1)
 
         instance = cls.__new__(cls)
         instance.__baseinit__(
@@ -157,6 +198,7 @@ class PCAPredictor:
             pca_eigenvectors=pca_eigenvectors,
             pca_eigenvalues=pca_eigenvalues,
             pca_explained_variance_ratio=pca_explained_variance_ratio,
+            transformer=transformer,
         )
         return instance
 
@@ -167,6 +209,7 @@ class PCAPredictor:
         svd_solver: str = "auto",
         variance_threshold: float = 1e-8,
         relative_variance_ratio: float = 1e-3,
+        transformer: Any | None = None,
     ) -> None:
         """Fit a PCA model on columns that pass simple variance screening."""
         df = nw.from_native(data, eager_only=True)
@@ -200,11 +243,15 @@ class PCAPredictor:
                 pca_eigenvectors=np.zeros((0, 0), dtype=float),
                 pca_eigenvalues=np.zeros((0,), dtype=float),
                 pca_explained_variance_ratio=np.zeros((0,), dtype=float),
+                transformer=transformer,
             )
             return
 
         X = df_reduced.to_numpy()
-        X_scaled = StandardScaler().fit_transform(X)
+        if transformer is None:
+            transformer = StandardScaler()
+
+        X_scaled = transformer.fit_transform(X)
 
         # if n_components is None:
         #     # Number of non-zero components is limited by rank of X
@@ -223,6 +270,7 @@ class PCAPredictor:
             # sklearn divides by the *total* variance of the input matrix,
             # so this correctly reflects information lost to truncation.
             pca_explained_variance_ratio=pca.explained_variance_ratio_,
+            transformer=transformer,
         )
 
     def _drop_parallel_constraints(
@@ -281,6 +329,24 @@ class PCAPredictor:
         d_new = {k: v for k, v in d.items() if k not in drop}
         return B_new, d_new
 
+    def _transform_partial(self, constraints: dict[str, float]) -> dict[str, float]:
+        """Transform partial constraints using the fitted transformer."""
+        # Create a full row filled with means
+        X_row = self._pca_means.copy()
+
+        # Update with constrained values
+        constrained_indices = {}
+        for col, val in constraints.items():
+            if col in self.pca_columns:
+                idx = self._pca_column_idx(col)
+                X_row[idx] = float(val)
+                constrained_indices[col] = idx
+
+        # Transform using the pipeline
+        X_trans = self.transformer.transform(X_row.reshape(1, -1))[0]
+
+        return {col: X_trans[idx] for col, idx in constrained_indices.items()}
+
     def predict(
         self,
         constraints: Mapping[str, float | int] | IntoDataFrame | None = None,
@@ -321,17 +387,16 @@ class PCAPredictor:
             ]
         )
 
-        standardized_constraints: dict[str, float] = {}
+        # Validate constraints are in PCA columns
         for var in constraints:
-            var = str(var)
-            if var not in self.pca_columns:
+            if str(var) not in self.pca_columns:
                 raise ValueError(
                     f"Constraint variable '{var}' is not part of the PCA columns."
                 )
-            idx = self._pca_column_idx(var)
-            standardized_constraints[var] = (
-                float(constraints[var]) - float(self._pca_means[idx])
-            ) / float(self._pca_stds[idx])
+
+        standardized_constraints = self._transform_partial(
+            {str(k): float(v) for k, v in constraints.items()}
+        )
 
         B = self.pca_eigenvectors.T[constraint_indices, :]
         d = {i: standardized_constraints[i] for i in standardized_constraints}
@@ -375,7 +440,9 @@ class PCAPredictor:
         y_opt = sol[:n_components] + target_pcs  # Bias by target PCs
 
         x_hat_standardized = self.pca_eigenvectors.T @ y_opt
-        x_hat_original = x_hat_standardized * self._pca_stds + self._pca_means
+        x_hat_original = self.transformer.inverse_transform(
+            x_hat_standardized.reshape(1, -1)
+        )[0]
         predicted_reduced = dict(zip(self.pca_columns, x_hat_original))
 
         self.y_opt = y_opt
@@ -395,13 +462,16 @@ class PCAPredictor:
         else:
             param = parameters
 
-        normalized_params = np.zeros_like(self._pca_means, dtype=float)
-        for i, col in enumerate(self.pca_columns):
+        # Check for missing parameters
+        for col in self.pca_columns:
             if col not in param:
                 raise ValueError(f"Parameter '{col}' is missing from input data.")
-            normalized_params[i] = (
-                float(param[col]) - float(self._pca_means[i])
-            ) / float(self._pca_stds[i])
+
+        # Create input array
+        X_row = np.array(
+            [float(param[col]) for col in self.pca_columns], dtype=float
+        )
+        normalized_params = self.transformer.transform(X_row.reshape(1, -1))[0]
 
         # pca_eigenvectors has shape (n_components, n_features); project
         # standardized features onto principal components.
@@ -423,9 +493,12 @@ class PCAPredictor:
 
         # pca_eigenvectors has shape (n_components, n_features); reconstruct
         # standardized features from principal-component coordinates.
-        reduced_params = (
+        reduced_params_standardized = (
             self.pca_eigenvectors.T @ principal_components
-        ) * self._pca_stds + self._pca_means
+        )
+        reduced_params = self.transformer.inverse_transform(
+            reduced_params_standardized.reshape(1, -1)
+        )[0]
         full_params = dict(zip(self.columns, self.means.tolist()))
         for col, val in zip(self.pca_columns, reduced_params.tolist()):
             full_params[col] = val
@@ -440,6 +513,10 @@ class PCAPredictor:
 
         If filename is None, return an in-memory buffer.
         """
+        transformer_bytes = np.frombuffer(
+            pickle.dumps(self.transformer), dtype=np.uint8
+        )
+
 
         if filename is None:
             fh = BytesIO()
@@ -452,6 +529,7 @@ class PCAPredictor:
                 pca_eigenvectors=self.pca_eigenvectors,
                 pca_eigenvalues=self.pca_eigenvalues,
                 pca_explained_variance_ratio=self.pca_explained_variance_ratio,
+                transformer=transformer_bytes,
             )
             fh.seek(0)
             return fh
@@ -465,4 +543,5 @@ class PCAPredictor:
                 pca_eigenvectors=self.pca_eigenvectors,
                 pca_eigenvalues=self.pca_eigenvalues,
                 pca_explained_variance_ratio=self.pca_explained_variance_ratio,
+                transformer=transformer_bytes,
             )
