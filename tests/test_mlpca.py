@@ -251,3 +251,95 @@ def test_predict_handles_zero_eigenvalue_without_nan():
 
     for v in pred.values():
         assert np.isfinite(v)
+
+
+# ---------------------------------------------------------------------------
+# Custom-transformer feature: save/load round-trip and validation
+# ---------------------------------------------------------------------------
+
+
+def test_pipeline_transformer_save_load_round_trip(tmp_path):
+    """A fitted Pipeline(PowerTransformer) must survive export/import.
+
+    Regression test for a bug where from_pca_data silently fell back to a
+    StandardScaler instead of loading the saved transformer.
+    """
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import PowerTransformer
+
+    df = make_dataset()
+    transformer = make_pipeline(
+        PowerTransformer(method="yeo-johnson", standardize=True)
+    )
+    model = PCAPredictor(df, transformer=transformer)
+
+    file = tmp_path / "model.npz"
+    model.export_pca_data(file)
+    loaded = PCAPredictor.from_pca_data(file)
+
+    # The loaded transformer must be the same kind (not a fallback scaler).
+    from sklearn.pipeline import Pipeline
+
+    assert isinstance(loaded.transformer, Pipeline)
+
+    # And it must produce identical predictions.
+    constraints = {"a": 0.5}
+    p1 = model.predict(constraints)
+    p2 = loaded.predict(constraints)
+    for k in model.columns:
+        assert np.isclose(p1[k], p2[k], rtol=1e-10, atol=1e-10), k
+
+
+def test_feature_mixing_transformer_rejected_at_fit_time():
+    """Transformers that mix columns silently produce wrong predictions.
+
+    PCAPredictor relies on per-feature transformations, so passing one that
+    mixes columns (e.g. an inner PCA) must fail loudly at fit time rather
+    than corrupting predictions later.
+    """
+    from sklearn.decomposition import PCA as SkPCA  # noqa: N811
+    from sklearn.pipeline import make_pipeline
+
+    df = make_dataset()
+    # Pick n_components so the inner PCA preserves shape (matches the number
+    # of PCA-eligible columns: a, b, c — d has zero variance and is dropped).
+    bad = make_pipeline(SkPCA(n_components=3))
+
+    with pytest.raises(ValueError, match="per-feature"):
+        PCAPredictor(df, transformer=bad)
+
+
+def test_shape_changing_transformer_rejected_at_fit_time():
+    """A transformer that drops or adds columns must be rejected."""
+    from sklearn.base import BaseEstimator, TransformerMixin
+
+    class DropFirstColumn(BaseEstimator, TransformerMixin):
+        def fit(self, X, y=None):
+            return self
+
+        def transform(self, X):
+            return np.asarray(X)[:, 1:]
+
+        def inverse_transform(self, X):
+            X = np.asarray(X)
+            pad = np.zeros((X.shape[0], 1))
+            return np.hstack([pad, X])
+
+    df = make_dataset()
+    with pytest.raises(ValueError, match="preserve shape"):
+        PCAPredictor(df, transformer=DropFirstColumn())
+
+
+def test_transformer_missing_required_method_rejected():
+    """Transformers without inverse_transform cannot be used."""
+
+    class NoInverse:
+        def fit_transform(self, X, y=None):
+            return X
+
+        def transform(self, X):
+            return X
+
+    df = make_dataset()
+    with pytest.raises(TypeError, match="inverse_transform"):
+        PCAPredictor(df, transformer=NoInverse())
