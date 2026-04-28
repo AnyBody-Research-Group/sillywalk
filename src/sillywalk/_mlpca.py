@@ -492,9 +492,7 @@ class PCAPredictor:
 
         # pca_eigenvectors has shape (n_components, n_features); reconstruct
         # standardized features from principal-component coordinates.
-        reduced_params_standardized = (
-            self.pca_eigenvectors.T @ principal_components
-        )
+        reduced_params_standardized = self.pca_eigenvectors.T @ principal_components
         reduced_params = self.transformer.inverse_transform(
             reduced_params_standardized.reshape(1, -1)
         )[0]
@@ -515,7 +513,6 @@ class PCAPredictor:
         transformer_bytes = np.frombuffer(
             pickle.dumps(self.transformer), dtype=np.uint8
         )
-
 
         if filename is None:
             fh = BytesIO()
