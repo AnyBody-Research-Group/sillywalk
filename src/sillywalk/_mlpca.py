@@ -18,7 +18,7 @@ import pickle
 from collections.abc import Mapping, Sequence
 from io import BytesIO
 from os import PathLike
-from typing import IO, Any
+from typing import IO, Any, cast
 from warnings import warn
 
 import narwhals as nw
@@ -187,8 +187,8 @@ class PCAPredictor:
             transformer.mean_ = np.array([means[i] for i in indices])
             transformer.scale_ = np.array([stds[i] for i in indices])
             transformer.var_ = transformer.scale_**2
-            transformer.n_features_in_ = len(pca_col_list)
-            transformer.n_samples_seen_ = np.int64(1)
+            transformer.n_features_in_ = len(pca_col_list)  # type: ignore[attr-defined]
+            transformer.n_samples_seen_ = np.int64(1)  # type: ignore[attr-defined]
 
         instance = cls.__new__(cls)
         instance.__baseinit__(
@@ -396,7 +396,7 @@ class PCAPredictor:
                 )
 
         standardized_constraints = self._transform_partial(
-            {str(k): float(v) for k, v in constraints.items()}
+            {str(k): float(cast(Any, v)) for k, v in constraints.items()}
         )
 
         B = self.pca_eigenvectors.T[constraint_indices, :]

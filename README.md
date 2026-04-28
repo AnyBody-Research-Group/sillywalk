@@ -286,12 +286,19 @@ By default, `PCAPredictor` uses `StandardScaler` to normalize data. You can prov
 **Note**: The transformer must operate element-wise or be compatible with partial constraints (e.g., standard scalers, min-max scalers, power transformers) for the prediction logic to work correctly when only some columns are constrained.
 
 ```python
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import PowerTransformer
 from sillywalk import PCAPredictor
 
-# Normalize data to [0, 1] range before PCA
-model = PCAPredictor(df, transformer=MinMaxScaler())
-prediction = model.predict({"a": 3.2})
+# Apply Yeo-Johnson transformation to make data more Gaussian
+# This can improve PCA performance when variables have non-linear relationships
+# (e.g. parabolic) as often seen in mixed motion datasets (e.g. walking vs running).
+transformer = make_pipeline(
+    PowerTransformer(method="yeo-johnson", standardize=True)
+)
+
+model = PCAPredictor(df, transformer=transformer)
+prediction = model.predict({"Height": 1.8})
 ```
 
 ---
