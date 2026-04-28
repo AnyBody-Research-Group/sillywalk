@@ -26,8 +26,7 @@ import numpy as np
 from narwhals.typing import IntoDataFrame, IntoDataFrameT
 from numpy.typing import NDArray
 from sklearn.decomposition import PCA  # type: ignore[import-untyped]
-from sklearn.preprocessing import \
-    StandardScaler  # type: ignore[import-untyped]
+from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
 
 # Type Alias Definition
 NumericSequenceOrArray = Sequence[float | int] | NDArray[np.floating | np.integer]
@@ -172,7 +171,9 @@ class PCAPredictor:
 
         # Legacy/Fallback: If no transformer was saved, reconstruct StandardScaler
         if transformer is None:
-            col_list = list(columns) if isinstance(columns, np.ndarray) else list(columns)
+            col_list = (
+                list(columns) if isinstance(columns, np.ndarray) else list(columns)
+            )
             pca_col_list = (
                 list(pca_columns)
                 if isinstance(pca_columns, np.ndarray)
@@ -468,9 +469,7 @@ class PCAPredictor:
                 raise ValueError(f"Parameter '{col}' is missing from input data.")
 
         # Create input array
-        X_row = np.array(
-            [float(param[col]) for col in self.pca_columns], dtype=float
-        )
+        X_row = np.array([float(param[col]) for col in self.pca_columns], dtype=float)
         normalized_params = self.transformer.transform(X_row.reshape(1, -1))[0]
 
         # pca_eigenvectors has shape (n_components, n_features); project
