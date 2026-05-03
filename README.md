@@ -279,6 +279,28 @@ pcs = model.parameters_to_components({k: pred[k] for k in model.pca_columns})
 back = model.components_to_parameters(pcs)
 ```
 
+### Advanced: Custom Transformers
+
+By default, `PCAPredictor` uses `StandardScaler` to normalize data. You can provide a custom transformer (e.g., `MinMaxScaler`, `PowerTransformer`, or a `Pipeline`) to control preprocessing.
+
+**Note**: The transformer must operate element-wise or be compatible with partial constraints (e.g., standard scalers, min-max scalers, power transformers) for the prediction logic to work correctly when only some columns are constrained.
+
+```python
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import PowerTransformer
+from sillywalk import PCAPredictor
+
+# Apply Yeo-Johnson transformation to make data more Gaussian
+# This can improve PCA performance when variables have non-linear relationships
+# (e.g. parabolic) as often seen in mixed motion datasets (e.g. walking vs running).
+transformer = make_pipeline(
+    PowerTransformer(method="yeo-johnson", standardize=True)
+)
+
+model = PCAPredictor(df, transformer=transformer)
+prediction = model.predict({"Height": 1.8})
+```
+
 ---
 
 ## License

@@ -98,6 +98,7 @@ def collection_of_tests(df_students, math, pd, pl, pytest, sillywalk):
             pca_eigenvectors=model1.pca_eigenvectors,
             pca_eigenvalues=model1.pca_eigenvalues,
             pca_explained_variance_ratio=model1.pca_explained_variance_ratio,
+            transformer=model1.transformer,
         )
         constr = {"Age": 26, "Shoesize": 40}
         assert model1.predict(constr) == pytest.approx(
