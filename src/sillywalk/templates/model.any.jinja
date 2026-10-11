@@ -96,7 +96,7 @@ Main.ModelSetup.SubjectSpecificData =
 AnyFolder PCA_drivers = {
   AnyVar Period =  DesignVar(1/{{scalar_data["freq"]}});
 
-  AnyMechObjectExcluder ExlucdeRhythms =
+  AnyMechObjectExcluder ExcludeRhythms =
   {
     Objects = arrcat(
     {%- if ammr_version and ammr_version[0] >= 4 %}
