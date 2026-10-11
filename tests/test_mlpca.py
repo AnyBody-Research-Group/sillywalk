@@ -77,6 +77,27 @@ def test_save_and_load_npz(tmp_path):
         assert np.isclose(p1[k], p2[k], rtol=1e-10, atol=1e-10)
 
 
+@pytest.mark.parametrize("missing_field", ["pca_eigenvectors", "pca_eigenvalues"])
+def test_from_pca_data_requires_eigenvectors_and_eigenvalues(missing_field):
+    model = PCAPredictor(make_dataset())
+
+    with pytest.raises(ValueError, match=r"^Missing required PCA data\.$"):
+        PCAPredictor.from_pca_data(
+            means=model.means,
+            stds=model.stds,
+            columns=model.columns,
+            pca_columns=model.pca_columns,
+            pca_eigenvectors=(
+                None if missing_field == "pca_eigenvectors" else model.pca_eigenvectors
+            ),
+            pca_eigenvalues=(
+                None if missing_field == "pca_eigenvalues" else model.pca_eigenvalues
+            ),
+            pca_explained_variance_ratio=model.pca_explained_variance_ratio,
+            transformer=model.transformer,
+        )
+
+
 def test_predict_without_constraints_returns_means():
     df = make_dataset()
     model = PCAPredictor(df)

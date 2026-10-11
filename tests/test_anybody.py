@@ -2,7 +2,9 @@ import math
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import polars as pl
+import pytest
 
 import sillywalk.anybody as anybody
 
@@ -55,6 +57,7 @@ def test_compute_fourier_coefficients_dataframe():
 
     coeffs = anybody.compute_fourier_coefficients(df, n_modes=6)
     assert isinstance(coeffs, pl.DataFrame)
+    assert coeffs.shape == (1, 11)
     # Expect columns sig_a0, sig_a1..a5, sig_b1..b5
     expected_cols = (
         ["sig_a0"]
@@ -65,6 +68,60 @@ def test_compute_fourier_coefficients_dataframe():
         assert c in coeffs.columns
     # Check dominant cosine at k=2
     assert math.isclose(coeffs[0, f"sig_a{k}"], 1.0, rel_tol=1e-6, abs_tol=1e-6)
+
+
+@pytest.mark.parametrize(
+    "backend", [pl.DataFrame, pd.DataFrame], ids=["polars", "pandas"]
+)
+def test_fourier_result_has_one_row_and_preserves_backend(backend):
+    phase = np.arange(128) / 128
+    signal = (
+        0.4
+        + 0.8 * np.cos(2 * np.pi * phase)
+        - 0.3 * np.cos(4 * np.pi * phase)
+        + 0.6 * np.sin(2 * np.pi * phase)
+        + 0.2 * np.sin(4 * np.pi * phase)
+    )
+    data = backend({"sig": signal, "shifted": 2.0 * signal + 1.0})
+    coefficients = anybody.compute_fourier_coefficients(data, n_modes=3)
+
+    assert isinstance(coefficients, backend)
+    assert coefficients.shape == (1, 10)
+    assert list(coefficients.columns) == [
+        "sig_a0",
+        "sig_a1",
+        "sig_a2",
+        "sig_b1",
+        "sig_b2",
+        "shifted_a0",
+        "shifted_a1",
+        "shifted_a2",
+        "shifted_b1",
+        "shifted_b2",
+    ]
+    np.testing.assert_allclose(
+        coefficients.to_numpy(),
+        [[0.4, 0.8, -0.3, 0.6, 0.2, 1.8, 1.6, -0.6, 1.2, 0.4]],
+        rtol=0,
+        atol=1e-12,
+    )
+
+
+@pytest.mark.parametrize(
+    "backend", [pl.DataFrame, pd.DataFrame], ids=["polars", "pandas"]
+)
+@pytest.mark.parametrize("signal", [[], [2.5]], ids=["empty-signal", "single-sample"])
+def test_fourier_result_keeps_one_row_with_only_available_modes(backend, signal):
+    coefficients = anybody.compute_fourier_coefficients(
+        backend({"sig": signal}), n_modes=6
+    )
+
+    assert isinstance(coefficients, backend)
+    assert coefficients.shape == (1, 1)
+    assert list(coefficients.columns) == ["sig_a0"]
+    np.testing.assert_allclose(
+        coefficients.to_numpy(), [[2.5 if signal else 0.0]], rtol=0, atol=1e-12
+    )
 
 
 def test_prepare_template_data_and_coefficient_insertion():

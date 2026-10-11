@@ -1,0 +1,128 @@
+name: AnyBody compatibility
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "29 3 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  load-latest:
+    if: >-
+      github.repository == 'AnyBody-Research-Group/sillywalk' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      SILLYWALK_ANYBODY_LOG_DIR: ${{ runner.temp }}\anybody-load
+      AMMR_PATH: ${{ runner.temp }}\ammr4-beta
+    steps:
+      - name: Check out trusted repository code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up locked integration environment
+        uses: prefix-dev/setup-pixi@d3f436a425481402e6a95a1d1fc10331c708cd9e # v0.10.2
+        with:
+          pixi-version: v0.76.0
+          environments: anybody
+          cache: false
+      - name: Resolve newest available console and AnyPyTools
+        run: |
+          $latestConsole = (Invoke-RestMethod "https://api.anaconda.org/package/anybody/anybodycon").latest_version
+          $latestTools = (Invoke-RestMethod "https://api.anaconda.org/package/conda-forge/anypytools").latest_version
+          $env:EXPECTED_CONSOLE_VERSION = $latestConsole
+          $env:EXPECTED_ANYPYTOOLS_VERSION = $latestTools
+          pixi update --environment anybody anybodycon anypytools --no-config --tls-root-certs system
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          @'
+          import importlib.metadata
+          import json
+          import os
+          import platform
+          from pathlib import Path
+          from urllib.parse import urlsplit
+
+          import yaml
+
+          lock = yaml.safe_load(Path("pixi.lock").read_text(encoding="utf-8"))
+          console_url = next(
+              package["conda"]
+              for package in lock["environments"]["anybody"]["packages"]["win-64"]
+              if "/anybodycon-" in package.get("conda", "")
+          )
+          package_name = Path(urlsplit(console_url).path).name
+          _, console_version, console_build = package_name.removesuffix(".conda").removesuffix(".tar.bz2").rsplit("-", 2)
+          tools_version = importlib.metadata.version("anypytools")
+          assert console_version == os.environ["EXPECTED_CONSOLE_VERSION"], "Latest console could not be resolved."
+          assert tools_version == os.environ["EXPECTED_ANYPYTOOLS_VERSION"], "Latest AnyPyTools could not be resolved."
+          output = Path(os.environ["SILLYWALK_ANYBODY_LOG_DIR"])
+          output.mkdir(parents=True, exist_ok=True)
+          (output / "resolved-versions.json").write_text(
+              json.dumps({
+                  "python": platform.python_version(),
+                  "anybodycon_package_version": console_version,
+                  "anybodycon_package_build": console_build,
+                  "anypytools": tools_version,
+                  "sillywalk": importlib.metadata.version("sillywalk"),
+                  "sillywalk_commit": os.environ["GITHUB_SHA"],
+              }, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          '@ | pixi run --as-is -e anybody python -
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Resolve and fetch current AMMR 4 beta revision
+        run: |
+          # The repository owner has accepted the AMMR beta's separate vendor terms.
+          $revision = git ls-remote https://github.com/AnyBody/AMMR4-Beta.git refs/heads/ammr4-beta
+          if ($LASTEXITCODE -ne 0 -or -not $revision) { throw "Cannot resolve the AMMR 4 beta branch." }
+          $sha = ($revision -split "\s+")[0]
+          if ($sha -notmatch "^[0-9a-f]{40}$") { throw "Invalid AMMR revision." }
+          git init --quiet "$env:AMMR_PATH"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C "$env:AMMR_PATH" fetch --quiet --depth=1 https://github.com/AnyBody/AMMR4-Beta.git $sha
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -c core.longpaths=true -C "$env:AMMR_PATH" checkout --quiet --detach FETCH_HEAD
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path (Join-Path $env:AMMR_PATH "LICENSE"))) {
+            throw "AMMR vendor license file is missing."
+          }
+          $metadataPath = Join-Path $env:SILLYWALK_ANYBODY_LOG_DIR "resolved-versions.json"
+          $metadata = Get-Content $metadataPath -Raw | ConvertFrom-Json
+          $metadata | Add-Member -NotePropertyName ammr_commit -NotePropertyValue $sha
+          $metadata | Add-Member -NotePropertyName ammr_source -NotePropertyValue "https://github.com/AnyBody/AMMR4-Beta"
+          $metadata | ConvertTo-Json | Set-Content $metadataPath -Encoding utf8
+      - name: Load generated model with repository license secrets
+        env:
+          RLM_LICENSE: ${{ secrets.RLM_LICENSE }}
+          RLM_LICENSE_PASSWORD: ${{ secrets.RLM_LICENSE_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:RLM_LICENSE) -or
+              [string]::IsNullOrWhiteSpace($env:RLM_LICENSE_PASSWORD)) {
+            throw "Required repository secrets RLM_LICENSE and RLM_LICENSE_PASSWORD are missing."
+          }
+          pixi run --as-is -e anybody test-anybody --tb=short
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve generated model and value-free or numeric evidence only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: anybody-load-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}\anybody-load\predicted.main.any
+            ${{ runner.temp }}\anybody-load\resolved-versions.json
+            ${{ runner.temp }}\anybody-load\loader-result.json
+          if-no-files-found: warn
+          retention-days: 14

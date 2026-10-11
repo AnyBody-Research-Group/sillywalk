@@ -9,7 +9,7 @@ platforms = ["win-64", "linux-64", "osx-arm64"]
 preview = ["pixi-build"]
 license = "MIT"
 license-file = "LICENSE"
-requires-pixi = ">=0.53.0"
+requires-pixi = ">=0.76.0"
 
 
 [tasks]
@@ -53,6 +53,17 @@ test = "pytest"
 test-coverage = "pytest --cov=sillywalk --cov-report=xml --cov-report=term-missing"
 marimo-test = "marimo edit tests/test_notebook.py"
 
+[feature.anybody]
+platforms = ["win-64"]
+channels = ["anybody"]
+
+[feature.anybody.target.win-64.dependencies]
+anybodycon = { version = ">=8.2.1", channel = "anybody" }
+anypytools = "*"
+
+[feature.anybody.tasks]
+test-anybody = "python -m pytest -p no:anypytools -m anybody tests/test_anybody_load.py"
+
 [feature.build.dependencies]
 python-build = "*"
 twine = "*"
@@ -62,6 +73,15 @@ uv-build = "*"
 [feature.build.tasks]
 build-wheel = "python -m build --no-isolation ."
 check-wheel = "twine check dist/*"
+
+[feature.docs.dependencies]
+zensical = ">=0.0.16,<0.1"
+polars = "*"
+
+[feature.docs.tasks]
+docs-build = "zensical build --strict"
+docs-serve = "zensical serve"
+docs-example = "python -m examples.synthetic_workflow"
 
 
 [feature.lint.dependencies]
@@ -77,6 +97,7 @@ ty = "*"
 
 [feature.lint.tasks]
 pre-commit-install = "pre-commit install"
+pre-commit-run = "pre-commit run -a"
 lint = "pre-commit run -a"
 typecheck-python = "ty check"
 
@@ -95,5 +116,7 @@ py311 = ["py311", "test"]
 py312 = ["py312", "test"]
 py313 = ["py313", "test"]
 py314 = ["py314", "test"]
+anybody = ["py313", "test", "anybody"]
 build = ["build"]
+docs = ["py313", "docs"]
 lint = { features = ["lint"], no-default-feature = true }

@@ -167,6 +167,8 @@ class PCAPredictor:
             or stds is None
             or columns is None
             or pca_columns is None
+            or pca_eigenvectors is None
+            or pca_eigenvalues is None
             or pca_explained_variance_ratio is None
             or transformer is None
         ):

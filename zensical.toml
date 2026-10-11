@@ -1,0 +1,32 @@
+[project]
+site_name = "sillywalk"
+site_description = "PCA-based constrained prediction and Fourier motion export for research workflows."
+repo_url = "https://github.com/AnyBody-Research-Group/sillywalk"
+docs_dir = "docs"
+site_dir = "site"
+use_directory_urls = false
+nav = [
+  { "Home" = "index.md" },
+  { "Getting started" = [
+    { "Installation" = "installation.md" },
+    { "Offline tutorial" = "tutorial.md" },
+  ] },
+  { "Research workflow" = [
+    { "Statement of need" = "statement-of-need.md" },
+    { "Data conventions" = "data-conventions.md" },
+    { "Methods and limitations" = "methods.md" },
+    { "Preprocessing and transformers" = "preprocessing.md" },
+    { "AnyBody integration" = "anybody-integration.md" },
+    { "External datasets" = "external-data.md" },
+  ] },
+  { "Reference" = [
+    { "PCAPredictor" = "api/predictor.md" },
+    { "Fourier and AnyScript utilities" = "api/anybody.md" },
+  ] },
+  { "Development and testing" = "development.md" },
+]
+
+[project.theme]
+language = "en"
+font = false
+features = ["navigation.sections", "navigation.footer", "content.code.copy"]

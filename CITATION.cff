@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: >-
+  If you use sillywalk in your research, please cite this software and state
+  the version or commit used in your methods.
+type: software
+title: sillywalk
+authors:
+  - given-names: Morten Enemark
+    family-names: Lund
+    orcid: https://orcid.org/0000-0001-9920-4051
+version: 1.3.0
+repository-code: https://github.com/AnyBody-Research-Group/sillywalk
+url: https://github.com/AnyBody-Research-Group/sillywalk
+license: MIT

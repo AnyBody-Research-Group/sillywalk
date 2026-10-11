@@ -4,305 +4,125 @@
 [![pypi-version](https://img.shields.io/pypi/v/sillywalk.svg?logo=pypi&logoColor=white&style=flat-square)](https://pypi.org/project/sillywalk)
 [![python-version](https://img.shields.io/pypi/pyversions/sillywalk?logoColor=white&logo=python&style=flat-square)](https://pypi.org/project/sillywalk)
 
-sillywalk is a Python library for statistical modeling of human motion and anthropometric data with the AnyBody Modeling System. It implements Maximum Likelihood Principal Component Analysis (ML‑PCA) to learn compact, low‑dimensional models from datasets, predict missing or individualized signals from partial inputs, and export those predictions as AnyScript include files that plug directly into AnyBody models.
+sillywalk is a Python library for PCA-based prediction of motion and
+anthropometric parameters from partial inputs, with Fourier utilities and
+AnyScript export for the AnyBody Modeling System.
 
-Key features
+Researchers can represent each motion cycle as a row of Fourier coefficients,
+combine it with named anthropometric measurements, fit a reduced statistical
+model and reconstruct a complete profile from selected constraints. The library
+uses NumPy, scikit-learn, Narwhals and Jinja2 rather than replacing their
+numerical or dataframe functionality.
 
-- AnyBody I/O and preprocessing: Post‑process AnyBody time series and convert them to Fourier coefficients compatible with `AnyKinEqFourierDriver`.
-- ML‑PCA modeling and prediction: Fit ML‑PCA models from tabular data, handle missing values naturally, and predict new samples from partial constraints; save/load models to and from `.npz`.
-- AnyBody model generation: Generate templated AnyScript include files (e.g., drivers and optional human model blocks) from predicted Fourier coefficients and anthropometry.
-- Friendly data interfaces: Works with pandas or polars DataFrames and NumPy arrays; installable via PyPI or pixi for reproducible workflows.
+The Python workflow does not require AnyBody. Loading or running generated
+AnyScript requires a separately installed AnyBody Modeling System and compatible
+AMMR. Rendered files are not automatically validated musculoskeletal models.
+The optional [AnyBody integration checks](docs/anybody-integration.md) target
+selected console and AMMR versions. They do not establish compatibility with
+every release or validate kinematics and dynamics.
 
-See Quick Start below for a minimal end‑to‑end example.
+## Start with the offline example
 
-## Installation
+Install [Pixi](https://pixi.sh/latest/installation/), then:
 
-With [pixi](https://pixi.sh):
-
-```bash
-pixi add sillywalk
-```
-
-or from PyPI:
-
-```bash
-pip install sillywalk
-```
-
-or with conda:
-
-```bash
-conda create -n sillywalk -c conda-forge sillywalk
-conda activate sillywalk
-```
-
-### Developer Setup
-
-This project uses `pixi` for dependency management and development tools.
-
-```bash
-git clone https://github.com/AnyBody-Research-Group/sillywalk
+```console
+git clone https://github.com/AnyBody-Research-Group/sillywalk.git
 cd sillywalk
-pixi install
-pixi run test
+pixi run --locked -e docs docs-example
 ```
 
-See [pixi documentation](https://pixi.sh/latest/) for more info.
+This creates 48 seeded synthetic observations, fits a model, predicts a profile
+from a height constraint, checks model persistence and Fourier reconstruction,
+and writes an AnyScript include to `example-output`.
 
----
+The example has no dataset downloads or AnyBody execution. Initial environment
+installation needs network access. Generated data illustrates software behavior,
+not measured human motion or evidence of predictive accuracy.
+See the [offline tutorial](docs/tutorial.md) for inputs, output files and units.
 
-## Quick Start
+## Install the library
 
-### 1. Build a Model
+Python 3.11 or newer is required. In your own Python environment:
 
-```python
-import polars as pl
-import sillywalk
-
-data = {
-    "Sex": [1, 1, 2, 2, 1, 2],
-    "Age": [25, 30, 28, 22, 35, 29],
-    "Stature": [175, 180, 165, 160, 185, 170],
-    "Bodyweight": [70, 80, 60, 55, 85, 65],
-    "Shoesize": [42, 44, 39, 38, 45, 40],
-}
-df = pl.DataFrame(data)
-model = sillywalk.PCAPredictor(df)
+```console
+python -m pip install sillywalk polars
 ```
 
-### 2. Predict Missing Values
+Use pandas instead of Polars if preferred. In an existing Pixi project,
+`pixi add sillywalk polars` installs the published conda package.
+See [installation instructions](docs/installation.md) for source environments,
+conda, platform targets and troubleshooting.
 
-```python
-constraints = {"Stature": 180, "Bodyweight": 65}
-result = model.predict(constraints)
-```
-
-### 3. Save and Load Models
-
-```python
-model.export_pca_data("student_model.npz")
-loaded = sillywalk.PCAPredictor.from_pca_data("student_model.npz")
-prediction = loaded.predict({"Age": 24, "Shoesize": 43})
-```
-
----
-
-## AnyBody Model Utilities
-
-`sillywalk` can convert time series data to Fourier coefficients compatible with AnyBody's `AnyKinEqFourierDriver`:
-
-```python
-import polars as pl
-import numpy as np
-import sillywalk
-
-time = np.linspace(0, 1, 101)
-hip = 30 * np.sin(2 * np.pi * time) + 10
-knee = 60 * np.sin(2 * np.pi * time + np.pi/4)
-
-df = pl.DataFrame({
-    'Main.HumanModel.BodyModel.Interface.Trunk.PelvisThoraxExtension': hip,
-    'Main.HumanModel.BodyModel.Interface.Right.KneeFlexion': knee,
-})
-
-fourier_df = sillywalk.anybody.compute_fourier_coefficients(df, n_modes=6)
-print(fourier_df)
-```
-
-Each time series column is decomposed into Fourier coefficients (`_a0` to `_a5`, `_b1` to `_b5`).
-
-```
-┌────────────┬────────────┬───────────┬───┬───────────┬───────────┬───────────┐
-│ ...tension ┆ ...tension ┆ ...tensio ┆ … ┆ ...Flexio ┆ ...Flexio ┆ ...Flexio │
-│ _a0        ┆ _a1        ┆ n_a2      ┆   ┆ n_b3      ┆ n_b4      ┆ n_b5      │
-│ ---        ┆ ---        ┆ ---       ┆   ┆ ---       ┆ ---       ┆ ---       │
-│ f64        ┆ f64        ┆ f64       ┆   ┆ f64       ┆ f64       ┆ f64       │
-╞════════════╪════════════╪═══════════╪═══╪═══════════╪═══════════╪═══════════╡
-│ 10.0       ┆ 0.928198   ┆ -0.021042 ┆ … ┆ -0.550711 ┆ -0.218252 ┆ -0.169925 │
-└────────────┴────────────┴───────────┴───┴───────────┴───────────┴───────────┘
-```
-
-### Generate AnyBody Include Files
-
-You can generate AnyScript include files from a dictionary or DataFrame with Fourier coefficients and/or anthropometric data:
-
-Let us try to generate a model from an anthropometric dataset. First we will download the data
-
-```python
->>> df =  pl.read_parquet("https://anybodydatasets.blob.core.windows.net/sillywalk/kso-running/kso-running-fourier-2025-12-28-0.parquet")
->>> df
-shape: (114, 1_317)
-┌──────────┬────────────┬────────────┬───────────┬───┬───────────┬───────────┬───────────┬───────────┐
-│ freq     ┆ Main.Human ┆ Main.Human ┆ Main.Huma ┆ … ┆ CenterOfM ┆ CenterOfM ┆ CenterOfM ┆ CenterOfM │
-│ ---      ┆ Model.Anth ┆ Model.Anth ┆ nModel.An ┆   ┆ ass.PosZ_ ┆ ass.PosZ_ ┆ ass.PosZ_ ┆ ass.PosZ_ │
-│ f64      ┆ ropometric ┆ ropometric ┆ thropomet ┆   ┆ b2        ┆ b3        ┆ b4        ┆ b5        │
-│          ┆ …          ┆ …          ┆ ric…      ┆   ┆ ---       ┆ ---       ┆ ---       ┆ ---       │
-│          ┆ ---        ┆ ---        ┆ ---       ┆   ┆ f64       ┆ f64       ┆ f64       ┆ f64       │
-│          ┆ f64        ┆ f64        ┆ f64       ┆   ┆           ┆           ┆           ┆           │
-╞══════════╪════════════╪════════════╪═══════════╪═══╪═══════════╪═══════════╪═══════════╪═══════════╡
-│ 1.415094 ┆ 0.164147   ┆ 0.107101   ┆ 0.119941  ┆ … ┆ 0.000389  ┆ -0.000774 ┆ 0.00013   ┆ 0.000322  │
-│ 1.395349 ┆ 0.164147   ┆ 0.107101   ┆ 0.119941  ┆ … ┆ 0.000571  ┆ -0.000821 ┆ 0.000059  ┆ 0.000282  │
-│ 1.382488 ┆ 0.164147   ┆ 0.107101   ┆ 0.119941  ┆ … ┆ -0.000097 ┆ -0.000827 ┆ 0.000112  ┆ 0.000301  │
-│ 1.395349 ┆ 0.164147   ┆ 0.107101   ┆ 0.119941  ┆ … ┆ 0.000522  ┆ -0.000882 ┆ 0.000209  ┆ 0.000253  │
-│ 1.369863 ┆ 0.164147   ┆ 0.107101   ┆ 0.119941  ┆ … ┆ 0.000482  ┆ -0.000949 ┆ 0.000141  ┆ 0.000215  │
-│ …        ┆ …          ┆ …          ┆ …         ┆ … ┆ …         ┆ …         ┆ …         ┆ …         │
-│ 1.321586 ┆ 0.1782     ┆ 0.116442   ┆ 0.13021   ┆ … ┆ 0.000114  ┆ -0.000281 ┆ -0.000132 ┆ 0.000007  │
-│ 1.327434 ┆ 0.1782     ┆ 0.116442   ┆ 0.13021   ┆ … ┆ 0.00038   ┆ -0.000289 ┆ -0.000112 ┆ -0.000051 │
-│ 1.382488 ┆ 0.16105    ┆ 0.107724   ┆ 0.117678  ┆ … ┆ -0.000125 ┆ -0.00011  ┆ 0.000099  ┆ -0.000029 │
-│ 1.428571 ┆ 0.16105    ┆ 0.107724   ┆ 0.117678  ┆ … ┆ -0.000062 ┆ -0.000198 ┆ -0.000006 ┆ -0.00008  │
-│ 1.485149 ┆ 0.16105    ┆ 0.107724   ┆ 0.117678  ┆ … ┆ 0.000787  ┆ -0.000113 ┆ 0.000108  ┆ 0.000021  │
-└──────────┴────────────┴────────────┴───────────┴───┴───────────┴───────────┴───────────┴───────────┘
-```
-
-This dataset contains data from a 114 running subjects, with their 'AnyBody' anthropometic dimensions and fourier coefficients to recreated their running patterns.
-
-Sillywalk can create PCA model from this data set, and we can get a prediction of average person with a height of 1.8m.
-
-```python
->>> model = sillywalk.PCAPredictor(df)
->>> predicted_data = model.predict({"Height": 1.8})
->>> pl.DataFrame(predicted_data)
-shape: (1, 1_317)
-┌──────────┬────────────┬────────────┬───────────┬───┬───────────┬───────────┬───────────┬───────────┐
-│ freq     ┆ Main.Human ┆ Main.Human ┆ Main.Huma ┆ … ┆ CenterOfM ┆ CenterOfM ┆ CenterOfM ┆ CenterOfM │
-│ ---      ┆ Model.Anth ┆ Model.Anth ┆ nModel.An ┆   ┆ ass.PosZ_ ┆ ass.PosZ_ ┆ ass.PosZ_ ┆ ass.PosZ_ │
-│ f64      ┆ ropometric ┆ ropometric ┆ thropomet ┆   ┆ b2        ┆ b3        ┆ b4        ┆ b5        │
-│          ┆ …          ┆ …          ┆ ric…      ┆   ┆ ---       ┆ ---       ┆ ---       ┆ ---       │
-│          ┆ ---        ┆ ---        ┆ ---       ┆   ┆ f64       ┆ f64       ┆ f64       ┆ f64       │
-│          ┆ f64        ┆ f64        ┆ f64       ┆   ┆           ┆           ┆           ┆           │
-╞══════════╪════════════╪════════════╪═══════════╪═══╪═══════════╪═══════════╪═══════════╪═══════════╡
-│ 1.395979 ┆ 0.170115   ┆ 0.112083   ┆ 0.124302  ┆ … ┆ -0.000044 ┆ -0.000206 ┆ -7.6567e- ┆ 0.000057  │
-│          ┆            ┆            ┆           ┆   ┆           ┆           ┆ 8         ┆           │
-└──────────┴────────────┴────────────┴───────────┴───┴───────────┴───────────┴───────────┴───────────┘
-```
-
-Sillywalk can then create an AnyBody model for us using this data:
-
-```
->>> sillywalk.anybody.write_anyscript(
-...     predicted_data,
-...     targetfile="predicted_motion.any"
-... )
-```
-
-This creates `AnyKinEqFourierDriver` entries for use in AnyBody models.
-
-```anyscript
-
-Main.HumanModel.Anthropometrics =
-{
-  BodyMass = 75.61897598069909;
-  BodyHeight = 1.8;
-};
-
-Main.HumanModel.Anthropometrics.SegmentDimensions =
-{
-  PelvisWidth = DesignVar(0.17011475699044465);
-  PelvisHeight = DesignVar(0.11208281142857143);
-  PelvisDepth = DesignVar(0.12430194406161754);
-
-...
-
-
-AnyFolder PCA_drivers = {
-  AnyVar Period =  DesignVar(1/1.3959786246912738);
-
-  AnyFolder JointsAndDrivers = {
-    AnyKinEqFourierDriver Trunk_PelvisPosX_Pos_0 = {
-      Type = CosSin;
-      Freq = 1/..Period;
-      CType = {Hard};
-      Reaction.Type = {Off};
-      MeasureOrganizer = {0};
-      AnyKinMeasure &m = Main.HumanModel.BodyModel.Main.HumanModel.BodyModel.Interface.Trunk.PelvisPosX;
-      AnyVar a0_offset ??= DesignVar(0.0);
-      A = {{  8.623540080091557e-10 + a0_offset, 0.00017990165903964024, 0.011945580192769307, -0.00013312081080007037, 0.00041700269239085025, -7.518299551487054e-05,  }};
-      B = {{ 0, 0.0004029987590162868, -0.010429170745175874, 0.00024439360060977196, 0.0003970888221702516, 5.258816436360581e-05,  }};
-    };
-    ...
-
-```
-
-#### Example: Complete Human Model
-
-Sillywalk will by default generate 'anyscript' files with antrhopometics and drivers which can be included in other models. But it is also possible to create a complete standalone model.
-
-```python
-sillywalk.anybody.write_anyscript(
-    predicted_data,
-    targetfile="complete_human_model.any",
-    create_human_model=True
-)
-```
-
-or using a jinja template for complete control:
-
-```python
-sillywalk.anybody.write_anyscript(
-    predicted_data,
-    targetfile="complete_human_model.any",
-    template="MyModel.any.jinja",
-    create_human_model=True
-)
-```
-
-See the [template sillywalk](https://github.com/AnyBody-Research-Group/sillywalk/blob/main/src/sillywalk/templates/model.any.jinja) uses as example.
-
-## PCAPredictor
-
-PCAPredictor selects numeric columns with sufficient variance and fits a PCA model. It can:
-
-- Predict all columns from partial constraints on PCA columns using a KKT least‑squares system.
-- Convert between primal parameters and principal components.
-- Persist models to `.npz` files.
-
-Notes
-
-- Constraints on columns excluded from PCA are not allowed and raise ValueError.
-- If no constraints are provided, `predict` returns the column means.
-- If no columns pass variance screening, the model has zero components and `predict` returns means.
-
-Example
+## Minimal prediction
 
 ```python
 import polars as pl
 from sillywalk import PCAPredictor
 
-df = pl.DataFrame({
-    "a": [1, 2, 3, 4],
-    "b": [2, 2.5, 3, 3.5],
-    "c": [10, 10, 10, 10],  # excluded (zero variance)
+# Constructed values: height in metres, mass in kilograms.
+table = pl.DataFrame({
+    "Height": [1.60, 1.68, 1.76, 1.84],
+    "Weight": [60.0, 68.0, 76.0, 84.0],
 })
-model = PCAPredictor(df)
-pred = model.predict({"a": 3.2})
-pcs = model.parameters_to_components({k: pred[k] for k in model.pca_columns})
-back = model.components_to_parameters(pcs)
+model = PCAPredictor(table, n_components=1)
+prediction = model.predict({"Height": 1.72})
+
+model.export_pca_data("synthetic_model.npz")
+loaded = PCAPredictor.from_pca_data("synthetic_model.npz")  # Trusted local file only.
 ```
 
-### Advanced: Custom Transformers
+Selected training features must be complete and finite. Missing inputs are
+supported as partial prediction constraints, not as missing training values.
+The implementation fits scikit-learn PCA, not an incomplete-data
+maximum-likelihood PCA estimator. Check constraint residuals and physical
+plausibility before using a prediction.
 
-By default, `PCAPredictor` uses `StandardScaler` to normalize data. You can provide a custom transformer (e.g., `MinMaxScaler`, `PowerTransformer`, or a `Pipeline`) to control preprocessing.
+Model archives contain a pickled fitted transformer. Loading an untrusted
+`.npz` model can execute code. Use trusted artifacts only.
 
-**Note**: The transformer must operate element-wise or be compatible with partial constraints (e.g., standard scalers, min-max scalers, power transformers) for the prediction logic to work correctly when only some columns are constrained.
+## Documentation
 
-```python
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import PowerTransformer
-from sillywalk import PCAPredictor
+| Topic                                             | Guide                                                                           |
+| ------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Research scope and intended use                   | [Statement of need](docs/statement-of-need.md)                                  |
+| Reproducible end-to-end workflow                  | [Offline tutorial](docs/tutorial.md)                                            |
+| Names, dataframe shapes, units and cycle sampling | [Data conventions](docs/data-conventions.md)                                    |
+| PCA, constraints and verification limits          | [Methods and limitations](docs/methods.md)                                      |
+| Custom transformers and endpoint correction       | [Preprocessing](docs/preprocessing.md)                                          |
+| Fourier drivers and AnyBody requirements          | [AnyBody integration](docs/anybody-integration.md)                              |
+| Public API                                        | [PCAPredictor](docs/api/predictor.md), [AnyBody utilities](docs/api/anybody.md) |
+| Dataset provenance and reuse boundaries           | [External datasets](docs/external-data.md)                                      |
+| Tests, linting and documentation build            | [Development](docs/development.md)                                              |
 
-# Apply Yeo-Johnson transformation to make data more Gaussian
-# This can improve PCA performance when variables have non-linear relationships
-# (e.g. parabolic) as often seen in mixed motion datasets (e.g. walking vs running).
-transformer = make_pipeline(
-    PowerTransformer(method="yeo-johnson", standardize=True)
-)
+Build the navigable documentation site locally:
 
-model = PCAPredictor(df, transformer=transformer)
-prediction = model.predict({"Height": 1.8})
+```console
+pixi run --locked -e docs docs-build
 ```
 
----
+Open `site\index.html` on Windows, or `site/index.html` on Linux/macOS.
+The documentation CI builds an artifact without publishing a website.
 
-## License
+## Development, support and citation
 
-MIT License. See [LICENSE](LICENSE) for details.
+```console
+pixi run --locked test
+pixi run -e lint lint
+```
+
+Report problems through the
+[issue tracker](https://github.com/AnyBody-Research-Group/sillywalk/issues).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution and support procedures,
+[CITATION.cff](CITATION.cff) for citation metadata, and [LICENSE](LICENSE) for
+the MIT license. Dataset and proprietary software licenses are separate.
+
+The [JOSS preparation folder](joss-prep/README.md) records submission-readiness
+work and questions that require author answers.
+
+For methodological background, the authors supplied the 2021 paper
+[_Running in circles: Describing running kinematics using Fourier series_](https://doi.org/10.1016/j.jbiomech.2020.110187).
+The [dataset guide](docs/external-data.md) records their free-use statement for
+shared data, including the ANSUR adaptation, while retaining the remaining
+source, unit and reuse-term questions. Neither that statement nor the method
+paper is evidence of measured-data predictive accuracy or independent package
+adoption.
