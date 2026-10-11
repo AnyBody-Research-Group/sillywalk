@@ -147,18 +147,20 @@ def compute_fourier_coefficients(
         raise ValueError("n_modes must be >= 1")
 
     df = nw.from_native(df_native)
-    out = df.select()
+    coefficients = []
 
     for col in df.columns:
         a, b = _anybody_fft(df[col].to_numpy())
         max_modes = min(n_modes, a.size)
-        out = out.with_columns(
-            nw.lit(a[0]).alias(col + "_a0"),
-            *[nw.lit(a[j]).alias(f"{col}_a{j}") for j in range(1, max_modes)],
-            *[nw.lit(b[j]).alias(f"{col}_b{j}") for j in range(1, max_modes)],
+        coefficients.extend(
+            [
+                nw.lit(a[0]).alias(col + "_a0"),
+                *[nw.lit(a[j]).alias(f"{col}_a{j}") for j in range(1, max_modes)],
+                *[nw.lit(b[j]).alias(f"{col}_b{j}") for j in range(1, max_modes)],
+            ]
         )
 
-    return out.to_native()
+    return df.select(*coefficients).to_native()
 
 
 def _add_new_coefficient(groupdata: dict, coef: str, val: float):

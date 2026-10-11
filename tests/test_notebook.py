@@ -41,9 +41,14 @@ def collection_of_tests(df_students, math, pd, pl, pytest, sillywalk):
         sillywalk.PCAPredictor(pd.read_csv("tests/students.csv"))
 
     def test_loading_model_from_npz_file():
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+
         model1 = sillywalk.PCAPredictor(pl.read_csv("tests/students.csv"))
-        model1.export_pca_data("model_params.npz")
-        model2 = sillywalk.PCAPredictor.from_pca_data("model_params.npz")
+        with TemporaryDirectory() as temp_dir:
+            model_path = Path(temp_dir) / "model_params.npz"
+            model1.export_pca_data(model_path)
+            model2 = sillywalk.PCAPredictor.from_pca_data(str(model_path))
 
         assert model1.pca_columns == model2.pca_columns
         assert all(model1.pca_eigenvalues == model2.pca_eigenvalues)
@@ -106,9 +111,14 @@ def collection_of_tests(df_students, math, pd, pl, pytest, sillywalk):
         )
 
     def test_save_reload_model():
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+
         model1 = sillywalk.PCAPredictor(df_students)
-        model1.export_pca_data("model1.npz")
-        model2 = sillywalk.PCAPredictor.from_pca_data("model1.npz")
+        with TemporaryDirectory() as temp_dir:
+            model_path = Path(temp_dir) / "model1.npz"
+            model1.export_pca_data(model_path)
+            model2 = sillywalk.PCAPredictor.from_pca_data(str(model_path))
         constr = {"Age": 24, "Shoesize": 43}
 
         assert model1.predict(constr) == pytest.approx(
@@ -139,17 +149,34 @@ def _(pl, sillywalk):
 
 @app.cell
 def _(pl, sillywalk):
-    data = pl.read_csv("tests/Fourier.csv")
+    def test_standalone_model_export(tmp_path):
+        data = (
+            pl.read_csv("tests/Fourier.csv")
+            .with_columns((1 / pl.col("T")).alias("freq"))
+            .drop("T")
+        )
+        data = data.rename(
+            {
+                name: name.replace("DOF:Main.HumanModel.BodyModel.", "DOF:", 1)
+                for name in data.columns
+                if name.startswith("DOF:Main.HumanModel.BodyModel.")
+            }
+        )
 
-    model_gait = sillywalk.PCAPredictor(data)
+        model_gait = sillywalk.PCAPredictor(data)
 
-    result = model_gait.predict({"Speed": 1.2})
+        result = model_gait.predict({"Speed": 1.2})
 
-    # create_human_model=True, crates a full HumanModel
-    # and not only an include file
-    sillywalk.anybody.create_model_file(
-        result, "Model.main.any", create_human_model=True
-    )
+        target = tmp_path / "Model.main.any"
+        sillywalk.anybody.write_anyscript(
+            result, targetfile=target, create_human_model=True, ammr_version=(3, 0, 0)
+        )
+        text = target.read_text(encoding="utf-8")
+        assert "Main =" in text
+        assert "AnyKinStudy Study" in text
+        assert "AnyKinEqFourierDriver" in text
+        assert "Main.HumanModel.BodyModel.Main.HumanModel.BodyModel" not in text
+
     return
 
 

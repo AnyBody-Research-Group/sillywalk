@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "sillywalk"
-description = "Library for maximum likelihood principal component analysis for AnyBody models"
+description = "PCA-based constrained prediction of anthropometry and cyclic motion for AnyBody models"
 authors = [{ name = "Morten Enemark Lund", email = "melund@gmail.com" }]
 version = "1.3.0"
 
@@ -23,6 +23,8 @@ dependencies = ["numpy", "jinja2", "scikit-learn", "narwhals"]
 
 [project.urls]
 repository = "https://github.com/AnyBody-Research-Group/sillywalk"
+Documentation = "https://github.com/AnyBody-Research-Group/sillywalk/tree/main/docs"
+Issues = "https://github.com/AnyBody-Research-Group/sillywalk/issues"
 
 [tool.hatch.version]
 path = "pixi.toml"
@@ -62,7 +64,7 @@ python = ".pixi/envs/default"
 
 
 [tool.typos]
-default.extend-words = { Excluder = "Excluder" }
+default.extend-words = { Excluder = "Excluder", arange = "arange" }
 
 
 # If you run into `missing library stubs or py.typed marker` errors
@@ -74,3 +76,7 @@ default.extend-words = { Excluder = "Excluder" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not anybody'"
+markers = [
+  "anybody: real AnyBody Console load tests (requires licensed console and AMMR)",
+]

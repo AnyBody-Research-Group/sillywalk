@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Support and contribution guidance
+    url: https://github.com/AnyBody-Research-Group/sillywalk/blob/main/CONTRIBUTING.md
+    about: Read how to ask a usage question, report a problem, or propose a change.
